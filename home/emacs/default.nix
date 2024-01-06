@@ -1,0 +1,112 @@
+{ pkgs, config, lib, mylib, ... }:
+
+{
+  programs.emacs = {
+    enable = true;
+    package = with pkgs; emacs29;
+    # emacs packages
+    extraPackages = epkgs: with epkgs; [
+      pkgs.nur-dcsunset.emacsPackages.modaled
+      pkgs.nur-dcsunset.emacsPackages.combobulate
+      pkgs.nur-dcsunset.emacsPackages.org-moderncv
+      default-text-scale
+      sideline
+      sideline-flymake
+      sideline-flycheck
+      popwin
+      minions
+      csv-mode
+      beancount
+      rainbow-mode
+      dashboard
+      smartparens
+      xclip
+      modus-themes
+      centaur-tabs
+      doom-modeline
+      nerd-icons
+      nerd-icons-dired
+      nerd-icons-completion
+      projectile
+      treemacs
+      treemacs-nerd-icons
+      which-key
+      vertico
+      marginalia
+      orderless
+      flycheck
+      flycheck-package
+      highlight
+      vterm
+      vterm-toggle
+      diff-hl
+      magit
+      magit-todos
+      ### deps for magit-todos
+      async
+      dash
+      f
+      hl-todo
+      pcre2el
+      s
+      ###
+      markdown-mode
+      nushell-mode
+      org
+      org-roam
+      org-roam-ui
+      org-super-agenda
+      xeft
+      company
+      nix-mode
+      haskell-mode
+      caddyfile-mode
+      # tree-sitter for emacs 29+
+      (treesit-grammars.with-grammars (grammars: with grammars; [
+        tree-sitter-json
+        tree-sitter-yaml
+        tree-sitter-toml
+        tree-sitter-html
+        tree-sitter-css
+        tree-sitter-markdown
+        tree-sitter-make
+        tree-sitter-dockerfile
+        tree-sitter-python
+        tree-sitter-bash
+        tree-sitter-c
+        tree-sitter-cpp
+        tree-sitter-go
+        tree-sitter-gomod
+        tree-sitter-rust
+        tree-sitter-javascript
+        tree-sitter-typescript
+        tree-sitter-tsx
+        tree-sitter-nix
+        tree-sitter-elisp
+      ]))
+    ];
+    extraConfig = mylib.readFiles [ ./hx.el ./default.el ];
+  };
+
+  # some config only take effects in user config instead of default.el
+  # home.file.".config/emacs/init.el".source = ./init.el;
+
+  home.shellAliases = {
+    # emacs in terminal
+    et = "emacsclient -t";
+    # emacs with GUI
+    eg = "emacsclient -c";
+  };
+
+  home.activation = {
+    emacsInit = lib.hm.dag.entryAfter ["writeBoundary"] ''
+      mkdir=${pkgs.coreutils}/bin/mkdir
+      emacsDir=/home/${config.home.username}/.config/emacs
+      # create necessary dirs
+      $DRY_RUN_CMD mkdir -p $emacsDir/auto-saves $emacsDir/backups
+    '';
+  };
+
+  # enable emacs daemon
+  services.emacs.enable = true;
+}
