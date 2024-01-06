@@ -1,7 +1,6 @@
-{ osConfig, lib, pkgs, ... }:
+{ lib, pkgs, ... }:
 
-with lib;
-mkIf osConfig.custom.graphics.gui {
+with lib; {
   programs.vscode = {
     enable = true;
     package = pkgs.vscodium;
@@ -9,7 +8,6 @@ mkIf osConfig.custom.graphics.gui {
     extensions = with pkgs.vscode-extensions; [
       llvm-vs-code-extensions.vscode-clangd
       streetsidesoftware.code-spell-checker
-      foam.foam-vscode
       ms-vscode.hexeditor
       mads-hartmann.bash-ide-vscode
       eamodio.gitlens
@@ -68,6 +66,9 @@ mkIf osConfig.custom.graphics.gui {
         "networking-terms"
         "typescript"
       ];
+
+      ## VSCode only
+      "telemetry.telemetryLevel" = "off";
     };
 
     keybindings = [
