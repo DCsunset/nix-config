@@ -219,6 +219,10 @@ with lib; {
         command = "selectPrevSuggestion";
         when = "suggestWidgetVisible && textInputFocus";
       }
+      {
+        key = "ctrl+p";
+        command = "-workbench.action.quickOpen";
+      }
     ];
   };
 }
