@@ -540,9 +540,29 @@
 ;;   :init
 ;;   (setq-default lsp-ui-doc-position 'at-point))
 
+;; gtd
+(defvar gtd-directory "~/.config/gtd/")
+(unless (file-exists-p gtd-directory)
+  (mkdir gtd-directory t))
+(defun gtd-file (file)
+  "Get path of a FILE in gtd."
+  (concat gtd-directory file))
+(defun gtd-save ()
+  "Save all buffers in gtd."
+  (save-some-buffers t (lambda ()
+                         (file-in-directory-p buffer-file-name gtd-directory))))
+(defun gtd-action (action)
+  "Return a fn to perform a gtd ACTION and save buffers."
+  (lambda ()
+    (interactive)
+    (call-interactively action)
+    (gtd-save)))
+
 ;; org-mode
 (use-package org
   :commands (org-todo
+             org-refile
+             org-priority
              org-insert-structure-template
              org-edit-special
              org-open-at-point
@@ -590,18 +610,12 @@
      (python . t)))
 
   ;; GTD in org-mode
-  (defvar org-gtd-directory "~/.config/gtd/")
-  (unless (file-exists-p org-gtd-directory)
-    (mkdir org-gtd-directory t))
-  (defun org-gtd-file (file)
-    "Get path of file in org-gtd"
-    (concat org-gtd-directory file))
   (setq org-capture-templates
         `(("i" "inbox" entry
-           (file+headline ,(org-gtd-file "inbox.org") "Inbox")
+           (file+headline ,(gtd-file "inbox.org") "Inbox")
            "* TODO %i%?")
           ("a" "archives" entry
-           (file+headline ,(org-gtd-file "archives.org") "Archives")
+           (file+headline ,(gtd-file "archives.org") "Archives")
            "* DONE %i%?")))
   (setq org-todo-keywords '((sequence "TODO(t)" "WAITING(w)" "SOMEDAY(s)" "|" "DONE(d)" "CANCELLED(c)")))
   (setq org-todo-keyword-faces
@@ -613,11 +627,11 @@
   (setq org-fontify-done-headline t
         org-fontify-todo-headline t)
   (setq org-refile-targets
-        `((,(org-gtd-file "actions.org") :maxlevel . 3)
-          (,(org-gtd-file "archives.org") :maxlevel . 3)))
+        `((,(gtd-file "actions.org") :maxlevel . 3)
+          (,(gtd-file "archives.org") :maxlevel . 3)))
   (setq org-agenda-files
-        `(,(org-gtd-file "inbox.org")
-          ,(org-gtd-file "actions.org")))
+        `(,(gtd-file "inbox.org")
+          ,(gtd-file "actions.org")))
   ;; save buffer after capture or refile
   (defun save-after-capture-refile ()
     (with-current-buffer (marker-buffer org-capture-last-stored-marker)
@@ -679,6 +693,13 @@ LOC can be `current' or `other'."
         org-roam-ui-update-on-save t
         org-roam-ui-open-on-start t))
 
+(use-package org-agenda
+  :commands
+  (org-agenda-redo
+   org-agenda-todo
+   org-agenda-priority
+   org-agenda-refile))
+
 (use-package org-super-agenda
   :commands org-super-agenda-mode
   :hook
@@ -710,9 +731,9 @@ LOC can be `current' or `other'."
     ("'ii" . ("org create id" . org-id-get-create))
     ("'l" . ("org toggle link display" . org-toggle-link-display))
     ;; org-gtd
-    ("'t" . ("org todo" . ,(hx-eval-with-region nil (org-todo))))
-    ("'r" . ("org refile" . ,(hx-eval-with-region nil (org-refile))))
-    ("'p" . ("org priority" . ,(hx-eval-with-region nil (org-priority))))))
+    ("'t" . ("org todo" . ,(hx-eval-with-region nil (org-todo) (gtd-save))))
+    ("'r" . ("org refile" . ,(hx-eval-with-region nil (org-refile) (gtd-save))))
+    ("'p" . ("org priority" . ,(hx-eval-with-region nil (org-priority) (gtd-save))))))
 ;; enable org substate only for org-mode & not insert state
 (modaled-enable-substate-on-state-change
   "org"
@@ -724,10 +745,10 @@ LOC can be `current' or `other'."
 (modaled-define-keys
   :substates '("org-agenda")
   :bind
-  `(("r" . ("rebuild agenda view" . org-agenda-redo))
-    ("'t" . ("org todo" . org-agenda-todo))
-    ("'p" . ("org priority" . org-agenda-priority))
-    ("'r" . ("org refile" . org-agenda-refile))))
+  `(("r" . ("rebuild agenda view" . ,(gtd-action #'org-agenda-redo)))
+    ("'t" . ("org todo" . ,(gtd-action #'org-agenda-todo)))
+    ("'p" . ("org priority" . ,(gtd-action #'org-agenda-priority)))
+    ("'r" . ("org refile" . ,(gtd-action #'org-agenda-refile)))))
 (modaled-enable-substate-on-state-change
   "org-agenda"
   :states '("normal" "select")
@@ -867,6 +888,50 @@ LOC can be `current' or `other'."
 (add-to-list 'auto-mode-alist '("\\.[jt]sx\\'" . tsx-ts-mode))
 (add-to-list 'auto-mode-alist '("\\.ya?ml\\'" . yaml-ts-mode))
 
+;; multiple cursors
+(defun hx-toggle-multiple-cursors ()
+  "Toggle multiple-cursors-mode."
+  (interactive)
+  (if multiple-cursors-mode
+      (mc/disable-multiple-cursors-mode)
+    (mc/maybe-multiple-cursors-mode)))
+
+(defun hx-toggle-cursor ()
+  "Toggle a cursor at point."
+  (interactive)
+  (let ((cursor (mc/fake-cursor-at-point)))
+    (if cursor
+        (mc/remove-fake-cursor cursor)
+      (mc/create-fake-cursor-at-point))))
+
+(defun hx-add-cursor ()
+  "Add a cursor at point if doesn't exist."
+  (interactive)
+  (let ((cursor (mc/fake-cursor-at-point)))
+    (when (not cursor)
+      (mc/create-fake-cursor-at-point))))
+
+(defun hx-remove-cursors ()
+  "Remove all extra cursors.
+Should be called only before entering multiple-cursors-mode."
+  (interactive)
+  (if multiple-cursors-mode
+      (message "multiple-cursors-mode already enabled! Call hx-toggle-multiple-cursors instead")
+    (mc/remove-fake-cursors)))
+
+(use-package multiple-cursors
+  :demand t
+  :commands (mc/maybe-multiple-cursors-mode
+             mc/disable-multiple-cursors-mode
+             mc/create-fake-cursor-at-point
+             mc/remove-fake-cursor
+             mc/fake-cursor-at-point
+             mc/remove-fake-cursors)
+  :config
+  ;; run it once to prevent disabling it immediately after enabling it
+  (add-to-list 'mc--default-cmds-to-run-once #'hx-toggle-multiple-cursors)
+  ;; need to save/restore hx--mark for each cursor
+  (add-to-list 'mc/cursor-specific-vars 'hx--mark))
 
 ;; modaled keybindings
 (modaled-define-keys
@@ -911,8 +976,8 @@ LOC can be `current' or `other'."
   :states '("major" "normal" "select")
   :bind
   ;; movement
-  `(("j" . ("left" . ,(hx-eval nil (hx-update-sel (ignore-errors (backward-char))))))
-    (";" . ("right" . ,(hx-eval nil (hx-update-sel (ignore-errors (forward-char))))))
+  `(("j" . ("left" . ,(hx-eval nil (hx-update-sel (ignore-errors (call-interactively #'backward-char))))))
+    (";" . ("right" . ,(hx-eval nil (hx-update-sel (ignore-errors (call-interactively #'forward-char))))))
     ("l" . ("up" . ,(hx-eval nil (hx-update-sel (ignore-errors (call-interactively #'previous-line))))))
     ("k" . ("down" . ,(hx-eval nil (hx-update-sel (ignore-errors (call-interactively #'next-line))))))
     ("w" . ("next word" . ,(hx-eval nil (hx-next-word (equal modaled-state "normal")))))
@@ -941,7 +1006,7 @@ LOC can be `current' or `other'."
     ("msi" . ("select inside current pair" . ,(hx-eval nil (hx-re-hl (hx-match-select :inside)))))
     ("ma" . ("surround with pair" . ,(hx-eval "c" (hx-re-hl (modaled-set-default-state) (hx-match-surround-add (car args))))))
     ("mr" . ("replace surrounding pair" . ,(hx-eval "c" (hx-re-hl (modaled-set-default-state) (hx-match-surround-replace (car args))))))
-    ;; C-i is the same as TAB for kbd
+    ;; C-i is the same as TAB for kbd and in terminal
     (,(kbd "C-i") . ("jump forward" . xref-go-forward))
     (,(kbd "C-o") . ("jump backward" . xref-go-back))
     ;; changes
@@ -953,10 +1018,8 @@ LOC can be `current' or `other'."
     ("O" . ("insert above" . ,(hx-eval nil (hx-no-sel-before (modaled-set-state "insert") (beginning-of-line) (newline-and-indent) (forward-line -1) (indent-according-to-mode)))))
     ("r" . ("replace" . ,(hx-eval "c" (hx-no-sel-after (modaled-set-default-state) (hx-region-replace (car args))))))
     ("y" . ("copy" . ,(hx-eval nil (modaled-set-default-state) (hx-region-apply #'kill-ring-save))))
-    ("d" . ("cut" . ,(hx-eval nil (hx-no-sel-after (modaled-set-default-state) (hx-region-apply #'kill-region)))))
-    (,(kbd "M-d") . ("delete" . ,(hx-eval nil (hx-no-sel-after (modaled-set-default-state) (hx-region-apply #'delete-region)))))
-    ("c" . ("change" . ,(hx-eval nil (hx-no-sel-after (modaled-set-state "insert") (hx-region-apply #'kill-region)))))
-    (,(kbd "M-c") . ("change w/o copying" . ,(hx-eval nil (hx-no-sel-after (modaled-set-state "insert") (hx-region-apply #'delete-region)))))
+    ("d" . ("delete" . ,(hx-eval nil (hx-no-sel-after (modaled-set-default-state) (hx-region-apply #'delete-region)))))
+    ("e" . ("edit" . ,(hx-eval nil (hx-no-sel-after (modaled-set-state "insert") (hx-region-apply #'delete-region)))))
     ("P" . ("paste before" . ,(hx-eval nil (hx-no-sel-after (hx-paste (current-kill 0 t) -1)))))
     ("p" . ("paste after" . ,(hx-eval nil (hx-no-sel-after (hx-paste (current-kill 0 t) +1)))))
     ("J" . ("join lines" . ,(hx-eval nil (hx-join-lines))))
@@ -982,10 +1045,16 @@ LOC can be `current' or `other'."
     (" k" . ("show doc in popup" . hx-show-eldoc))
     ;; view mode
     ("vt" . ("toggle visibility" . hx-toggle-visibility))
+    ;; multiple cursors
+    (" c" . ("toggle multiple-cursors-mode" . hx-toggle-multiple-cursors))
+    ("c" . ("add cursor and move next line" . ,(hx-cmds #'hx-add-cursor #'next-line)))
+    ("C" . ("add cursor and move prev line" . ,(hx-cmds #'hx-add-cursor #'previous-line)))
+    (,(kbd "M-c") . ("toggle a cursor at point" . hx-toggle-cursor))
+    (,(kbd "M-C") . ("remove all cursors" . hx-remove-cursors))
     ;; gtd
     (" tl" . ("gtd list" . org-todo-list))
-    (" ti" . ("gtd inbox" . ,(hx-eval nil (find-file (org-gtd-file "inbox.org")))))
-    (" ta" . ("gtd actions" . ,(hx-eval nil (find-file (org-gtd-file "actions.org")))))
+    (" ti" . ("gtd inbox" . ,(hx-eval nil (find-file (gtd-file "inbox.org")))))
+    (" ta" . ("gtd actions" . ,(hx-eval nil (find-file (gtd-file "actions.org")))))
     (" tc" . ("gtd capture" . org-capture))
     ;; notes (org-roam & xeft)
     (" nf" . ("note find" . org-roam-node-find))
@@ -1019,6 +1088,7 @@ LOC can be `current' or `other'."
     (,(kbd "M-\\") . ("eval region" . ,(hx-eval nil (hx-region-apply #'eval-region))))
     (":" . ("run command" . execute-extended-command))
     ("q" . ("quit window" . quit-window))
+    ("Q" . ("kill buffer" . kill-this-buffer))
     ;; major-mode specific command
     ("'x" . ,(hx-eval-with-region nil
                (let ((command (lookup-key (current-local-map) (kbd "C-c C-c"))))
@@ -1073,7 +1143,9 @@ LOC can be `current' or `other'."
   :bind
   `(([escape] . ("default state" . ,(hx-eval nil (hx-no-sel-after (modaled-set-default-state) (hx-format-blank-line)))))
     (,(kbd "M-`") . ("toggle vterm" . vterm-toggle))
-    (,(kbd "M-q") . ("kill buffer" . kill-this-buffer))
+    (,(kbd "M-h") . ("split horizontally" . ,(hx-cmds #'split-window-horizontally #'other-window)))
+    (,(kbd "M-v") . ("split vertically" . ,(hx-cmds #'split-window-vertically #'other-window)))
+    (,(kbd "M-q") . ("delete window" . delete-window))
     (,(kbd "M-j") . ("left window" . windmove-left))
     (,(kbd "M-;") . ("right window" . windmove-right))
     (,(kbd "M-l") . ("up window" . windmove-up))

@@ -9,6 +9,7 @@
       pkgs.nur-dcsunset.emacsPackages.modaled
       pkgs.nur-dcsunset.emacsPackages.combobulate
       pkgs.nur-dcsunset.emacsPackages.org-moderncv
+      multiple-cursors
       default-text-scale
       sideline
       sideline-flymake

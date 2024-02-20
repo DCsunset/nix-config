@@ -183,6 +183,13 @@ Toggle it when ARG is nil or 0."
     (funcall hx--last-change)
     (setq hx--last-change nil)))
 
+(defun hx-cmds (&rest commands)
+  "Run a list of COMMANDS interactively."
+  (declare (indent defun))
+  (lambda ()
+    (interactive)
+    (dolist (cmd commands)
+      (call-interactively cmd))))
 
 (defmacro hx-eval (arg-desc &rest body)
   "Return an interactive lambda (&rest args) with ARG-DESC to evaluate BODY forms."
