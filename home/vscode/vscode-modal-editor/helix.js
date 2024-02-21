@@ -39,7 +39,7 @@ module.exports = {
 		/* Multi-cursor
 		 * (for insert cursor above, use keybindings.json for Alt-Shift-C)
 		 */
-		C: repeatable("editor.action.insertCursorBelow"),
+		c: repeatable("editor.action.insertCursorBelow"),
 		",": "removeSecondaryCursors",
 
 		J: repeatable("editor.action.joinLines"),
@@ -88,7 +88,7 @@ module.exports = {
 
 		// into command mode
 		":": "modalEditor.setCommandMode",
-		
+
 		// replay last change
 		".": {
 			command: "modalEditor.replayRecord",
@@ -96,7 +96,7 @@ module.exports = {
 		},
 
 		// Changes
-		c: recordChange([
+		e: recordChange([
 			"modalEditor.cut",
 			"modalEditor.setInsertMode"
 		]),
