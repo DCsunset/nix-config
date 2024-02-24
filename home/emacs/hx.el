@@ -516,14 +516,16 @@ ARG can be one of the following:
 (defun hx-toggle-visibility ()
   "Toggle visibility."
   (interactive)
-  (when (eq major-mode 'org-mode)
-    (org-cycle)))
+  (cond
+   ((eq major-mode 'org-mode) (org-cycle))
+   ((eq major-mode 'magit-status-mode) (call-interactively #'magit-section-toggle))))
 
 (defun hx-previous ()
   "Previous in context."
   (interactive)
   (cond
    ((eq major-mode 'org-mode) (org-previous-visible-heading 1))
+   ((eq major-mode 'magit-status-mode) (magit-section-backward))
    (t (combobulate-navigate-logical-previous))))
 
 (defun hx-next ()
@@ -531,6 +533,7 @@ ARG can be one of the following:
   (interactive)
   (cond
    ((eq major-mode 'org-mode) (org-next-visible-heading 1))
+   ((eq major-mode 'magit-status-mode) (magit-section-forward))
    (t (combobulate-navigate-logical-next))))
 
 (defun hx-previous-sibling ()
@@ -538,6 +541,7 @@ ARG can be one of the following:
   (interactive)
   (cond
    ((eq major-mode 'org-mode) (org-backward-heading-same-level 1))
+   ((eq major-mode 'magit-status-mode) (magit-section-backward-sibling))
    (t (combobulate-navigate-previous))))
 
 (defun hx-next-sibling ()
@@ -545,5 +549,6 @@ ARG can be one of the following:
   (interactive)
   (cond
    ((eq major-mode 'org-mode) (org-forward-heading-same-level 1))
+   ((eq major-mode 'magit-status-mode) (magit-section-forward-sibling))
    (t (combobulate-navigate-next))))
 

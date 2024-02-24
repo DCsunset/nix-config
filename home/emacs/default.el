@@ -789,6 +789,24 @@ LOC can be `current' or `other'."
   :init
   (magit-todos-mode 1))
 
+;; magit-status-mode specific keybindings
+(modaled-define-substate "magit-status")
+(modaled-define-keys
+  :substates '("magit-status")
+  :bind
+  `(("s" . ("stage" . magit-stage))
+    ("S" . ("stage all" . magit-stage-modified))
+    ("u" . ("unstage" . magit-unstage))
+    ("U" . ("unstage all" . magit-unstage-all))
+    ("P" . ("push changes" . magit-push))
+    ("F" . ("pull changes" . magit-pull))
+    ("d" . ("diff" . magit-diff))
+    ("c" . ("commit" . magit-commit))))
+(modaled-enable-substate-on-state-change
+  "magit-status"
+  :states '("normal" "select")
+  :major '(magit-status-mode))
+
 
 ;; vterm (insert as default state)
 (use-package vterm
@@ -1044,7 +1062,7 @@ Should be called only before entering multiple-cursors-mode."
     (" ?" . ("search symbol" . apropos))
     (" k" . ("show doc in popup" . hx-show-eldoc))
     ;; view mode
-    ("vt" . ("toggle visibility" . hx-toggle-visibility))
+    ("v" . ("toggle visibility" . hx-toggle-visibility))
     ;; multiple cursors
     (" c" . ("toggle multiple-cursors-mode" . hx-toggle-multiple-cursors))
     ("c" . ("add cursor and move next line" . ,(hx-cmds #'hx-add-cursor #'next-line)))
