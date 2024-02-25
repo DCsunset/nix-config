@@ -801,6 +801,7 @@ LOC can be `current' or `other'."
     ("P" . ("push changes" . magit-push))
     ("F" . ("pull changes" . magit-pull))
     ("d" . ("diff" . magit-diff))
+    ("D" . ("discard" . magit-discard))
     ("c" . ("commit" . magit-commit))))
 (modaled-enable-substate-on-state-change
   "magit-status"
@@ -1040,6 +1041,8 @@ Should be called only before entering multiple-cursors-mode."
     ("e" . ("edit" . ,(hx-eval nil (hx-no-sel-after (modaled-set-state "insert") (hx-region-apply #'delete-region)))))
     ("P" . ("paste before" . ,(hx-eval nil (hx-no-sel-after (hx-paste (current-kill 0 t) -1)))))
     ("p" . ("paste after" . ,(hx-eval nil (hx-no-sel-after (hx-paste (current-kill 0 t) +1)))))
+    (,(kbd "M-P") . ("paste before from kill-ring)" . ,(hx-eval nil (hx-no-sel-after (hx-paste (read-from-kill-ring "To paste: ") -1)))))
+    (,(kbd "M-p") . ("paste after from kill-ring)" . ,(hx-eval nil (hx-no-sel-after (hx-paste (read-from-kill-ring "To paste: ") +1)))))
     ("J" . ("join lines" . ,(hx-eval nil (hx-join-lines))))
     ("u" . ("undo" . ,(hx-eval nil (hx-no-sel-before (call-interactively #'undo)))))
     ("U" . ("redo" . ,(hx-eval nil (hx-no-sel-before (call-interactively #'undo-redo)))))
@@ -1054,13 +1057,13 @@ Should be called only before entering multiple-cursors-mode."
     ;; space mode
     (" P" . ("clipboard paste before" . ,(hx-eval nil (hx-no-sel-after (hx-paste (xclip-get-selection 'clipboard) -1)))))
     (" p" . ("clipboard paste after" . ,(hx-eval nil (hx-no-sel-after (hx-paste (xclip-get-selection 'clipboard) +1)))))
-    (" y" . ("copy to clipbaord" . ,(hx-eval nil (modaled-set-default-state) (xclip-set-selection 'clipboard (hx-region-string)))))
+    (" y" . ("copy to clipboard" . ,(hx-eval nil (modaled-set-default-state) (xclip-set-selection 'clipboard (hx-region-string)))))
     (" f" . ("find file (projectile)" . projectile-find-file))
     (" F" . ("find file (dired)" . find-file))
     (" b" . ("switch to buffer" . switch-to-buffer))
     (" d" . ("directory tree" . treemacs))
     (" ?" . ("search symbol" . apropos))
-    (" k" . ("show doc in popup" . hx-show-eldoc))
+    (" k" . ("show eldoc" . hx-show-eldoc))
     ;; view mode
     ("v" . ("toggle visibility" . hx-toggle-visibility))
     ;; multiple cursors
@@ -1119,7 +1122,7 @@ Should be called only before entering multiple-cursors-mode."
   `((,(kbd "C-w") . ("delete word backward" . hx-delete-word-backward))
     (,(kbd "M-i") . ("code suggestion (LSP)" . company-manual-begin))
     ;; this makes pasting work in GUI
-    (,(kbd "C-V") . ("paste from clipbaord" . ,(hx-eval nil (insert (xclip-get-selection 'clipboard)))))))
+    (,(kbd "C-V") . ("paste from clipboard" . ,(hx-eval nil (insert (xclip-get-selection 'clipboard)))))))
 ;; (add-hook
 ;;  'modaled-insert-state-mode-hook
 ;;  (lambda ()
