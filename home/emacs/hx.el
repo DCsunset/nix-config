@@ -164,6 +164,7 @@ Toggle it when ARG is nil or 0."
 
 (defun hx-format-blank-line ()
   "Remove whitespaces if this line is empty."
+  (interactive)
   (save-excursion
     (beginning-of-line)
     (and (looking-at "[ \t]+$")
@@ -179,48 +180,84 @@ Toggle it when ARG is nil or 0."
   command)
 (defun hx-repeat-change ()
   "Repeat last change."
+  (interactive)
   (when hx--last-change
     (funcall hx--last-change)
     (setq hx--last-change nil)))
 
-(defun hx-cmds (&rest commands)
-  "Run a list of COMMANDS interactively."
-  (declare (indent defun))
-  (lambda ()
-    (interactive)
-    (dolist (cmd commands)
-      (call-interactively cmd))))
+(defun hx-no-sel ()
+  "Clear selection and disable highlight for it."
+  (interactive)
+  (hx-unhighlight)
+  (hx-set-mark nil))
 
-(defmacro hx-eval (arg-desc &rest body)
-  "Return an interactive lambda (&rest args) with ARG-DESC to evaluate BODY forms."
-  (declare (indent defun))
-  (let ((args (if arg-desc '(&rest args) '())))
-    `(lambda ,args
-      (interactive ,arg-desc)
-      (progn ,@body))))
+(defmacro hx (&rest args)
+  "Construct an interactive lambda function based on ARGS.
 
-(defmacro hx-eval-with-region (arg-desc &rest body)
-  "Return an interactive lambda (&rest args) with ARG-DESC to evaluate BODY forms.
-Region is activated for other commands to work with the native region."
+ARGS is a list separated by options (name starts with :).
+The following options are available:
+:arg ARG     Argument descriptor for the interactive lambda function.
+             Argument will be (&rest args).
+:region      Set native region to `hx-region' for body forms.
+:re-hl       Re-highlight selection.
+:re-sel      Update selection based on modaled state.
+             Re-highlight if in SELECT state or clear selection otherwise.
+:eval FORMS  Forms to evaluate in body."
   (declare (indent defun))
-  (let ((args (if arg-desc '(&rest args) '())))
-    `(lambda ,args
-      (interactive ,arg-desc)
-      ;; transient-mark-mode must be true for region-active-p to be true
-      (let ((transient-mark-mode t))
-        (set-mark hx--mark)
-        (progn ,@body)
-        (set-mark nil)))))
-
-
-(defmacro hx-re-mark (&rest body)
-  "Re-mark at current point before evaluating BODY forms."
-  (declare (indent defun))
-  `(progn
-     (hx-unhighlight)
-     (hx-set-mark (point))
-     ,@body
-     (hx-highlight)))
+  (let* ((opts
+          ;; normalize options by partitioning args by : items
+          (let ((parts (-partition-before-pred
+                        (lambda (it)
+                          ;; it could be a list for funcall
+                          (and (symbolp it)
+                               (string-prefix-p ":" (symbol-name it))))
+                        args)))
+            ;; convert to plist
+            (seq-reduce (lambda (acc p)
+                          (plist-put acc (car p) (cdr p)))
+                        parts
+                        '())))
+         (arg-desc (plist-get opts :arg))
+         (lambda-args (if arg-desc '(&rest args) '()))
+         (eval-forms (mapcar (lambda (f)
+                               (if (listp f)
+                                   f
+                                 `(call-interactively #',f)))
+                             (plist-get opts :eval)))
+         (region-wrapper (lambda (f)
+                           (if (not (plist-member opts :region)) f
+                             ;; transient-mark-mode must be true
+                             ;; for region-active-p to be true
+                             `(let ((transient-mark-mode t))
+                                (set-mark hx--mark)
+                                ,f
+                                (set-mark nil)))))
+         (re-hl-wrapper (lambda (f)
+                           (if (not (plist-member opts :re-hl)) f
+                             `(progn
+                                (hx-unhighlight)
+                                ,f
+                                (hx-highlight)))))
+         (re-sel-wrapper (lambda (f)
+                           (if (not (plist-member opts :re-sel)) f
+                             `(if (equal modaled-state "select")
+                                  (progn
+                                    (hx-unhighlight)
+                                    ,f
+                                    (hx-highlight))
+                                (hx-no-sel)
+                                ,f)))))
+    `(lambda ,lambda-args
+       (interactive ,arg-desc)
+       ,(funcall
+         (-compose region-wrapper
+                   re-hl-wrapper
+                   re-sel-wrapper)
+         ;; need to catch error to let wrappers finish completely
+         `(condition-case err
+              (progn ,@eval-forms)
+            (error
+             (message "%s" (error-message-string err))))))))
 
 (defmacro hx-re-hl (&rest body)
   "Re-highlight selection after evaluating BODY forms."
@@ -230,37 +267,6 @@ Region is activated for other commands to work with the native region."
     (hx-unhighlight)
     ,@body
     (hx-highlight)))
-
-(defmacro hx-no-sel-before (&rest body)
-  "Clear selection before evaluating BODY forms."
-  (declare (indent defun))
-  `(progn
-     (hx-unhighlight)
-     (hx-set-mark nil)
-     ,@body))
-
-(defmacro hx-no-sel-after (&rest body)
-  "Clear selection after evaluating BODY forms."
-  (declare (indent defun))
-  `(progn
-     ,@body
-     (hx-unhighlight)
-     (hx-set-mark nil)))
-
-(defmacro hx-update-sel (&rest body)
-  "Update selection based on modaled state and evaludate BODY forms.
-Re-highlight if in select state or clear selection otherwise."
-  (declare (indent defun))
-  `(hx-apply-if (equal modaled-state "select") hx-re-hl hx-no-sel-before
-    ,@body))
-
-
-(defmacro hx-apply-if (value then else &rest body)
-  "Apply BODY to THEN if VALUE is t or ELSE otherwise."
-  (declare (indent defun))
-  `(if ,value
-       (,then ,@body)
-     (,else ,@body)))
 
 (defun hx-find-char (char direction offset &optional marking)
   "Find CHAR in DIRECTION and place the cursor with OFFSET from it.
@@ -342,6 +348,7 @@ Set mark when MARKING is t."
 
 (defun hx-extend-to-line-bounds ()
   "Extend selection to line bounds."
+  (interactive)
   (let ((start (line-beginning-position))
         (end (line-end-position))
         (changed nil))
@@ -356,6 +363,7 @@ Set mark when MARKING is t."
 
 (defun hx-extend-line-below ()
   "Select current line or extend to next line if already selected."
+  (interactive)
   (unless (hx-extend-to-line-bounds)
     (forward-line 1)
     (hx-extend-to-line-bounds)))
@@ -364,6 +372,7 @@ Set mark when MARKING is t."
   "Join lines in selecions.
 
 If the selection is within one line, join the next line."
+  (interactive)
   (let* ((region (hx-region))
          (beg (car region))
          (end (cdr region)))
@@ -406,6 +415,7 @@ Default is 1 which means the nearest level."
 
 (defun hx-match-char ()
   "Go to matching (or surrounding) char at current point."
+  (interactive)
   (let ((pair (hx-get-enclosing-pair)))
     (when pair
       (let ((beg (plist-get pair :beg))
@@ -482,6 +492,7 @@ ARG can be one of the following:
 
 (defun hx-match-surround-delete ()
   "Delete surrounding matching pair around current selection."
+  (interactive)
   (let* ((region (hx-region))
          (left (char-after (car region)))
          (right (char-before (cdr region))))

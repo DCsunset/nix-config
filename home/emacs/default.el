@@ -549,6 +549,7 @@
   (concat gtd-directory file))
 (defun gtd-save ()
   "Save all buffers in gtd."
+  (interactive)
   (save-some-buffers t (lambda ()
                          (file-in-directory-p buffer-file-name gtd-directory))))
 (defun gtd-action (action)
@@ -721,19 +722,19 @@ LOC can be `current' or `other'."
 (modaled-define-keys
   :substates '("org")
   :bind
-  `(("'o" . ("org open (other window)" . ,(hx-eval nil (org-open 'other))))
-    (([return] ,(kbd "RET")) . ("org open" . ,(hx-eval nil (org-open 'current))))
+  `(("'o" . ("org open (other window)" . ,(hx :eval (org-open 'other))))
+    (([return] ,(kbd "RET")) . ("org open" . ,(hx :eval (org-open 'current))))
     ("'w" . ("org edit" . org-edit-special))
     ("'e" . ("org export" . org-export-dispatch))
-    ("'it" . ("org insert template" . ,(hx-eval nil
+    ("'it" . ("org insert template" . ,(hx :eval
                                          (modaled-set-state "insert")
-                                         (call-interactively #'org-insert-structure-template))))
+                                         org-insert-structure-template)))
     ("'ii" . ("org create id" . org-id-get-create))
     ("'l" . ("org toggle link display" . org-toggle-link-display))
     ;; org-gtd
-    ("'t" . ("org todo" . ,(hx-eval-with-region nil (org-todo) (gtd-save))))
-    ("'r" . ("org refile" . ,(hx-eval-with-region nil (org-refile) (gtd-save))))
-    ("'p" . ("org priority" . ,(hx-eval-with-region nil (org-priority) (gtd-save))))))
+    ("'t" . ("org todo" . ,(hx :region :eval org-todo gtd-save)))
+    ("'r" . ("org refile" . ,(hx :region :eval org-refile gtd-save)))
+    ("'p" . ("org priority" . ,(hx :region :eval org-priority gtd-save)))))
 ;; enable org substate only for org-mode & not insert state
 (modaled-enable-substate-on-state-change
   "org"
@@ -823,7 +824,7 @@ LOC can be `current' or `other'."
 (modaled-define-keys
   :substates '("vterm")
   :bind
-  `((("i" "a" "I" "A") . ("insert" . ,(hx-eval nil (hx-no-sel-before (modaled-set-state "insert") (vterm-reset-cursor-point)))))))
+  `((("i" "a" "I" "A") . ("insert" . ,(hx :eval hx-no-sel (modaled-set-state "insert") vterm-reset-cursor-point)))))
 ;; passing control keys to terminal instead of modifying buffer (buffer is read-only)
 (modaled-define-substate "vterm-insert"
   :sparse t
@@ -956,13 +957,13 @@ Should be called only before entering multiple-cursors-mode."
 (modaled-define-keys
   :states '("normal")
   :bind
-  `(("s" . ("enable SELECT state" . ,(hx-eval nil (modaled-set-state "select"))))
+  `(("s" . ("enable SELECT state" . ,(hx :eval (modaled-set-state "select"))))
     ;; search (select after search)
-    ("/" . ("search forward" . ,(hx-eval nil (hx-re-hl (isearch-forward-regexp) (backward-char) (hx-set-mark isearch-other-end)))))
-    ("?" . ("search backward" . ,(hx-eval nil (hx-re-hl (isearch-backward-regexp) (hx-set-mark (1- isearch-other-end))))))
-    ("n" . ("next match" . ,(hx-eval nil (hx-re-hl (isearch-repeat-forward) (backward-char) (hx-set-mark isearch-other-end) (isearch-exit)))))
-    ("N" . ("prev match" . ,(hx-eval nil (hx-re-hl (isearch-repeat-backward) (hx-set-mark (1- isearch-other-end)) (isearch-exit)))))
-    ("*" . ("search selection" . ,(hx-eval nil (setq isearch-string (hx-region-string)))))
+    ("/" . ("search forward" . ,(hx :re-hl :eval isearch-forward-regexp backward-char (hx-set-mark isearch-other-end))))
+    ("?" . ("search backward" . ,(hx :re-hl :eval isearch-backward-regexp (hx-set-mark (1- isearch-other-end)))))
+    ("n" . ("next match" . ,(hx :re-hl :eval isearch-repeat-forward backward-char (hx-set-mark isearch-other-end) isearch-exit)))
+    ("N" . ("prev match" . ,(hx :re-hl :eval isearch-repeat-backward (hx-set-mark (1- isearch-other-end)) isearch-exit)))
+    ("*" . ("search selection" . ,(hx :eval (setq isearch-string (hx-region-string)))))
     (,(kbd "M-/") . ("search lines" . occur))))
 ;; Problem: all windows share the same cursor shape
 ;; (add-hook
@@ -981,7 +982,8 @@ Should be called only before entering multiple-cursors-mode."
    ;;   (send-string-to-terminal "\e[2 q"))
    (unless (equal modaled-state "select")
      ; entering select state
-     (hx-set-mark (point)))))
+     (unless hx--mark
+       (hx-set-mark (point))))))
 (modaled-define-keys
   :states '("select")
   :bind
@@ -995,69 +997,69 @@ Should be called only before entering multiple-cursors-mode."
   :states '("major" "normal" "select")
   :bind
   ;; movement
-  `(("j" . ("left" . ,(hx-eval nil (hx-update-sel (ignore-errors (call-interactively #'backward-char))))))
-    (";" . ("right" . ,(hx-eval nil (hx-update-sel (ignore-errors (call-interactively #'forward-char))))))
-    ("l" . ("up" . ,(hx-eval nil (hx-update-sel (ignore-errors (call-interactively #'previous-line))))))
-    ("k" . ("down" . ,(hx-eval nil (hx-update-sel (ignore-errors (call-interactively #'next-line))))))
-    ("w" . ("next word" . ,(hx-eval nil (hx-next-word (equal modaled-state "normal")))))
-    ("b" . ("prev word" . ,(hx-eval nil (hx-previous-word (equal modaled-state "normal")))))
-    ("f" . ("find next char" . ,(hx-eval "c" (hx-find-char (car args) +1 -1 (equal modaled-state "normal")))))
-    ("t" . ("find till next char" . ,(hx-eval "c" (hx-find-char (car args) +1 -2 (equal modaled-state "normal")))))
-    ("F" . ("find prev char" . ,(hx-eval "c" (hx-find-char (car args) -1 0 (equal modaled-state "normal")))))
-    ("T" . ("find till prev char" . ,(hx-eval "c" (hx-find-char (car args) -1 1 (equal modaled-state "normal")))))
-    (,(kbd "C-u") . ("scroll up" . ,(hx-eval nil (hx-update-sel (forward-line -10)))))
-    (,(kbd "C-d") . ("scroll down" . ,(hx-eval nil (hx-update-sel (forward-line 10)))))
+  `(("j" . ("left" . ,(hx :re-sel :eval backward-char)))
+    (";" . ("right" . ,(hx :re-sel :eval forward-char)))
+    ("l" . ("up" . ,(hx :re-sel :eval previous-line)))
+    ("k" . ("down" . ,(hx :re-sel :eval next-line)))
+    ("w" . ("next word" . ,(hx :eval (hx-next-word (equal modaled-state "normal")))))
+    ("b" . ("prev word" . ,(hx :eval (hx-previous-word (equal modaled-state "normal")))))
+    ("f" . ("find next char" . ,(hx :arg "c" :eval (hx-find-char (car args) +1 -1 (equal modaled-state "normal")))))
+    ("t" . ("find till next char" . ,(hx :arg "c" :eval (hx-find-char (car args) +1 -2 (equal modaled-state "normal")))))
+    ("F" . ("find prev char" . ,(hx :arg "c" :eval (hx-find-char (car args) -1 0 (equal modaled-state "normal")))))
+    ("T" . ("find till prev char" . ,(hx :arg "c" :eval (hx-find-char (car args) -1 1 (equal modaled-state "normal")))))
+    (,(kbd "C-u") . ("scroll up" . ,(hx :re-sel :eval (funcall-interactively #'previous-line 10))))
+    (,(kbd "C-d") . ("scroll down" . ,(hx :re-sel :eval (funcall-interactively #'next-line 10))))
     ;; goto mode
-    ("gg" . ("go to line" . ,(hx-eval "p" (hx-update-sel (forward-line (- (car args) (line-number-at-pos)))))))
-    ("ge" . ("end of file" . ,(hx-eval nil (hx-update-sel (goto-char (point-max))))))
-    ("gj" . ("start of line" . ,(hx-eval nil (hx-update-sel (beginning-of-line)))))
-    ("g;" . ("end of line" . ,(hx-eval nil (hx-update-sel (end-of-line) (re-search-backward ".\\|^")))))  ; move to last char if exists
+    ("gg" . ("go to line" . ,(hx :arg "p" :re-sel :eval (forward-line (- (car args) (line-number-at-pos))))))
+    ("ge" . ("end of file" . ,(hx :re-sel :eval (goto-char (point-max)))))
+    ("gj" . ("start of line" . ,(hx :re-sel :eval beginning-of-line)))
+    ("g;" . ("end of line" . ,(hx :re-sel :eval end-of-line (re-search-backward ".\\|^"))))  ; move to last char if exists
     ("gn" . ("next buffer" . centaur-tabs-forward))
     ("gp" . ("prev buffer" . centaur-tabs-backward))
     ("gN" . ("next buffer" . centaur-tabs-forward-group))
     ("gP" . ("prev buffer" . centaur-tabs-backward-group))
-    ("gd" . ("go to def" . ,(hx-eval nil (let ((xref-prompt-for-identifier nil)) (call-interactively #'xref-find-definitions)))))
+    ("gd" . ("go to def" . ,(hx :eval (let ((xref-prompt-for-identifier nil)) (call-interactively #'xref-find-definitions)))))
     ;; match mode
-    ("mm" . ("match char" . ,(hx-eval nil (hx-update-sel (hx-match-char)))))
-    ("mj" . ("beginning of current pair" . ,(hx-eval nil (hx-update-sel (sp-beginning-of-sexp)))))
-    ("m;" . ("end of current pair" . ,(hx-eval nil (hx-update-sel (sp-end-of-sexp)))))
-    ("msa" . ("select around current pair" . ,(hx-eval nil (hx-re-hl (hx-match-select :around)))))
-    ("msi" . ("select inside current pair" . ,(hx-eval nil (hx-re-hl (hx-match-select :inside)))))
-    ("ma" . ("surround with pair" . ,(hx-eval "c" (hx-re-hl (modaled-set-default-state) (hx-match-surround-add (car args))))))
-    ("mr" . ("replace surrounding pair" . ,(hx-eval "c" (hx-re-hl (modaled-set-default-state) (hx-match-surround-replace (car args))))))
+    ("mm" . ("match char" . ,(hx :re-sel :eval hx-match-char)))
+    ("mj" . ("beginning of current pair" . ,(hx :re-sel :eval sp-beginning-of-sexp)))
+    ("m;" . ("end of current pair" . ,(hx  :re-sel :eval sp-end-of-sexp)))
+    ("msa" . ("select around current pair" . ,(hx :re-hl :eval (hx-match-select :around))))
+    ("msi" . ("select inside current pair" . ,(hx :re-hl :eval (hx-match-select :inside))))
+    ("ma" . ("surround with pair" . ,(hx :arg "c" :re-hl :eval modaled-set-default-state (hx-match-surround-add (car args)))))
+    ("mr" . ("replace surrounding pair" . ,(hx :arg "c" :re-hl :eval modaled-set-default-state (hx-match-surround-replace (car args)))))
     ;; C-i is the same as TAB for kbd and in terminal
     (,(kbd "C-i") . ("jump forward" . xref-go-forward))
     (,(kbd "C-o") . ("jump backward" . xref-go-back))
     ;; changes
-    ("i" . ("insert before" . ,(hx-eval nil (hx-no-sel-before (modaled-set-state "insert")))))
-    ("a" . ("insert after" . ,(hx-eval nil (hx-no-sel-before (modaled-set-state "insert") (forward-char)))))
-    ("I" . ("insert at start of line" . ,(hx-eval nil (hx-no-sel-before (modaled-set-state "insert") (back-to-indentation)))))
-    ("A" . ("insert at end of line" . ,(hx-eval nil (hx-no-sel-before (modaled-set-state "insert") (end-of-line)))))
-    ("o" . ("insert below" . ,(hx-eval nil (hx-no-sel-before (modaled-set-state "insert") (end-of-line) (newline-and-indent)))))
-    ("O" . ("insert above" . ,(hx-eval nil (hx-no-sel-before (modaled-set-state "insert") (beginning-of-line) (newline-and-indent) (forward-line -1) (indent-according-to-mode)))))
-    ("r" . ("replace" . ,(hx-eval "c" (hx-no-sel-after (modaled-set-default-state) (hx-region-replace (car args))))))
-    ("y" . ("copy" . ,(hx-eval nil (modaled-set-default-state) (hx-region-apply #'kill-ring-save))))
-    ("d" . ("delete" . ,(hx-eval nil (hx-no-sel-after (modaled-set-default-state) (hx-region-apply #'delete-region)))))
-    ("e" . ("edit" . ,(hx-eval nil (hx-no-sel-after (modaled-set-state "insert") (hx-region-apply #'delete-region)))))
-    ("P" . ("paste before" . ,(hx-eval nil (hx-no-sel-after (hx-paste (current-kill 0 t) -1)))))
-    ("p" . ("paste after" . ,(hx-eval nil (hx-no-sel-after (hx-paste (current-kill 0 t) +1)))))
-    (,(kbd "M-P") . ("paste before from kill-ring)" . ,(hx-eval nil (hx-no-sel-after (hx-paste (read-from-kill-ring "To paste: ") -1)))))
-    (,(kbd "M-p") . ("paste after from kill-ring)" . ,(hx-eval nil (hx-no-sel-after (hx-paste (read-from-kill-ring "To paste: ") +1)))))
-    ("J" . ("join lines" . ,(hx-eval nil (hx-join-lines))))
-    ("u" . ("undo" . ,(hx-eval nil (hx-no-sel-before (call-interactively #'undo)))))
-    ("U" . ("redo" . ,(hx-eval nil (hx-no-sel-before (call-interactively #'undo-redo)))))
-    (">" . ("indent" . ,(hx-eval nil (hx-re-hl (hx-extended-region-apply #'indent-rigidly 2)))))
-    ("<" . ("unindent" . ,(hx-eval nil (hx-re-hl (hx-extended-region-apply #'indent-rigidly -2)))))
-    ("." . ("repeat changes" . ,(hx-eval nil (hx-repeat-change))))
-    ("=" . ("format" . ,(hx-eval nil (hx-re-hl (hx-extended-region-apply #'indent-region)))))
-    (,(kbd "C-c") . ("comment/uncomment" . ,(hx-eval nil (hx-re-hl (hx-extended-region-apply #'comment-or-uncomment-region)))))
+    ("i" . ("insert before" . ,(hx :eval hx-no-sel (modaled-set-state "insert"))))
+    ("a" . ("insert after" . ,(hx :eval hx-no-sel (modaled-set-state "insert") forward-char)))
+    ("I" . ("insert at start of line" . ,(hx :eval hx-no-sel (modaled-set-state "insert") back-to-indentation)))
+    ("A" . ("insert at end of line" . ,(hx :eval hx-no-sel (modaled-set-state "insert") end-of-line)))
+    ("o" . ("insert below" . ,(hx :eval hx-no-sel (modaled-set-state "insert") end-of-line newline-and-indent)))
+    ("O" . ("insert above" . ,(hx :eval hx-no-sel (modaled-set-state "insert") beginning-of-line newline-and-indent (forward-line -1) indent-according-to-mode)))
+    ("r" . ("replace" . ,(hx :arg "c" :eval hx-no-sel modaled-set-default-state (hx-region-replace (car args)))))
+    ("y" . ("copy" . ,(hx :eval modaled-set-default-state (hx-region-apply #'kill-ring-save))))
+    ("d" . ("delete" . ,(hx :eval modaled-set-default-state (hx-region-apply #'delete-region) hx-no-sel)))
+    ("e" . ("edit" . ,(hx :eval (modaled-set-state "insert") (hx-region-apply #'delete-region) hx-no-sel)))
+    ("P" . ("paste before" . ,(hx :eval (hx-paste (current-kill 0 t) -1) hx-no-sel)))
+    ("p" . ("paste after" . ,(hx :eval (hx-paste (current-kill 0 t) +1) hx-no-sel)))
+    (,(kbd "M-P") . ("paste before from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") -1) hx-no-sel)))
+    (,(kbd "M-p") . ("paste after from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") +1) hx-no-sel)))
+    ("J" . ("join lines" . hx-join-lines))
+    ("u" . ("undo" . ,(hx :eval hx-no-sel undo)))
+    ("U" . ("redo" . ,(hx :eval hx-no-sel undo-redo)))
+    (">" . ("indent" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-rigidly 2))))
+    ("<" . ("unindent" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-rigidly -2))))
+    ("." . ("repeat changes" . hx-repeat-change))
+    ("=" . ("format" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-region))))
+    (,(kbd "C-c") . ("comment/uncomment" . ,(hx :re-hl :eval (hx-extended-region-apply #'comment-or-uncomment-region))))
     ;; selection
-    ("x" . ("extend line below" . ,(hx-eval nil (hx-re-hl (hx-extend-line-below)))))
-    ("X" . ("extend line" . ,(hx-eval nil (hx-re-hl (hx-extend-to-line-bounds)))))
+    ("x" . ("extend line below" . ,(hx :re-hl :eval hx-extend-line-below)))
+    ("X" . ("extend line" . ,(hx :re-hl :eval hx-extend-to-line-bounds)))
     ;; space mode
-    (" P" . ("clipboard paste before" . ,(hx-eval nil (hx-no-sel-after (hx-paste (xclip-get-selection 'clipboard) -1)))))
-    (" p" . ("clipboard paste after" . ,(hx-eval nil (hx-no-sel-after (hx-paste (xclip-get-selection 'clipboard) +1)))))
-    (" y" . ("copy to clipboard" . ,(hx-eval nil (modaled-set-default-state) (xclip-set-selection 'clipboard (hx-region-string)))))
+    (" P" . ("clipboard paste before" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) -1) hx-no-sel)))
+    (" p" . ("clipboard paste after" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) +1) hx-no-sel)))
+    (" y" . ("copy to clipboard" . ,(hx :eval modaled-set-default-state (xclip-set-selection 'clipboard (hx-region-string)))))
     (" f" . ("find file (projectile)" . projectile-find-file))
     (" F" . ("find file (dired)" . find-file))
     (" b" . ("switch to buffer" . switch-to-buffer))
@@ -1068,14 +1070,14 @@ Should be called only before entering multiple-cursors-mode."
     ("v" . ("toggle visibility" . hx-toggle-visibility))
     ;; multiple cursors
     (" c" . ("toggle multiple-cursors-mode" . hx-toggle-multiple-cursors))
-    ("c" . ("add cursor and move next line" . ,(hx-cmds #'hx-add-cursor #'next-line)))
-    ("C" . ("add cursor and move prev line" . ,(hx-cmds #'hx-add-cursor #'previous-line)))
+    ("c" . ("add cursor and move next line" . ,(hx :eval hx-add-cursor next-line)))
+    ("C" . ("add cursor and move prev line" . ,(hx :eval hx-add-cursor previous-line)))
     (,(kbd "M-c") . ("toggle a cursor at point" . hx-toggle-cursor))
     (,(kbd "M-C") . ("remove all cursors" . hx-remove-cursors))
     ;; gtd
     (" tl" . ("gtd list" . org-todo-list))
-    (" ti" . ("gtd inbox" . ,(hx-eval nil (find-file (gtd-file "inbox.org")))))
-    (" ta" . ("gtd actions" . ,(hx-eval nil (find-file (gtd-file "actions.org")))))
+    (" ti" . ("gtd inbox" . ,(hx :eval (find-file (gtd-file "inbox.org")))))
+    (" ta" . ("gtd actions" . ,(hx :eval (find-file (gtd-file "actions.org")))))
     (" tc" . ("gtd capture" . org-capture))
     ;; notes (org-roam & xeft)
     (" nf" . ("note find" . org-roam-node-find))
@@ -1105,13 +1107,13 @@ Should be called only before entering multiple-cursors-mode."
     ;; misc
     ("!" . ("run shell command" . shell-command))
     ("|" . ("eval expr" . eval-expression))
-    ("\\" . ("eval region and print" . ,(hx-eval nil (hx-region-apply #'eval-region t))))
-    (,(kbd "M-\\") . ("eval region" . ,(hx-eval nil (hx-region-apply #'eval-region))))
+    ("\\" . ("eval region and print" . ,(hx :eval (hx-region-apply #'eval-region t))))
+    (,(kbd "M-\\") . ("eval region" . ,(hx :eval (hx-region-apply #'eval-region))))
     (":" . ("run command" . execute-extended-command))
     ("q" . ("quit window" . quit-window))
     ("Q" . ("kill buffer" . kill-this-buffer))
     ;; major-mode specific command
-    ("'x" . ,(hx-eval-with-region nil
+    ("'x" . ,(hx :region :eval
                (let ((command (lookup-key (current-local-map) (kbd "C-c C-c"))))
                  (when command
                    (call-interactively command)))))))
@@ -1122,7 +1124,7 @@ Should be called only before entering multiple-cursors-mode."
   `((,(kbd "C-w") . ("delete word backward" . hx-delete-word-backward))
     (,(kbd "M-i") . ("code suggestion (LSP)" . company-manual-begin))
     ;; this makes pasting work in GUI
-    (,(kbd "C-V") . ("paste from clipboard" . ,(hx-eval nil (insert (xclip-get-selection 'clipboard)))))))
+    (,(kbd "C-V") . ("paste from clipboard" . ,(hx :eval (insert (xclip-get-selection 'clipboard)))))))
 ;; (add-hook
 ;;  'modaled-insert-state-mode-hook
 ;;  (lambda ()
@@ -1134,7 +1136,7 @@ Should be called only before entering multiple-cursors-mode."
 (modaled-define-keys
   :states '("major")
   :bind
-  `(("i" . ("NORMAL state" . ,(hx-eval nil (modaled-set-state "normal"))))))
+  `(("i" . ("NORMAL state" . ,(hx :eval (modaled-set-state "normal"))))))
 
 (defun hx-save ()
   "Save buffer or finish editing."
@@ -1162,10 +1164,10 @@ Should be called only before entering multiple-cursors-mode."
 (modaled-define-keys
   :states '("major" "normal" "select" "insert")
   :bind
-  `(([escape] . ("default state" . ,(hx-eval nil (hx-no-sel-after (modaled-set-default-state) (hx-format-blank-line)))))
+  `(([escape] . ("default state" . ,(hx :eval modaled-set-default-state hx-format-blank-line hx-no-sel)))
     (,(kbd "M-`") . ("toggle vterm" . vterm-toggle))
-    (,(kbd "M-h") . ("split horizontally" . ,(hx-cmds #'split-window-horizontally #'other-window)))
-    (,(kbd "M-v") . ("split vertically" . ,(hx-cmds #'split-window-vertically #'other-window)))
+    (,(kbd "M-h") . ("split horizontally" . ,(hx :eval split-window-horizontally other-window)))
+    (,(kbd "M-v") . ("split vertically" . ,(hx :eval split-window-vertically other-window)))
     (,(kbd "M-q") . ("delete window" . delete-window))
     (,(kbd "M-j") . ("left window" . windmove-left))
     (,(kbd "M-;") . ("right window" . windmove-right))
