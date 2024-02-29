@@ -217,7 +217,7 @@ The following options are available:
                           (plist-put acc (car p) (cdr p)))
                         parts
                         '())))
-         (arg-desc (plist-get opts :arg))
+         (arg-desc (car (plist-get opts :arg)))
          (lambda-args (if arg-desc '(&rest args) '()))
          (eval-forms (mapcar (lambda (f)
                                (if (listp f)
