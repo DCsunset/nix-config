@@ -13,7 +13,7 @@
       default-text-scale
       sideline
       sideline-flymake
-      sideline-flycheck
+      flymake-cspell
       popwin
       minions
       csv-mode
@@ -35,8 +35,6 @@
       vertico
       marginalia
       orderless
-      flycheck
-      flycheck-package
       highlight
       vterm
       vterm-toggle

@@ -239,65 +239,6 @@
               (doom-modeline-set-modeline 'my-modeline 'default)))
   (doom-modeline-mode 1))
 
-(use-package flycheck
-  :commands (global-flycheck-mode
-             flycheck-checker-get
-             flycheck-get-checker-for-buffer
-             flycheck-define-checker
-             flycheck-define-command-checker
-             flycheck-define-error-level
-             flycheck-add-next-checker)
-  :custom-face
-  (flycheck-debug ((t (:underline t))))
-  :init
-  (setf (get 'flycheck-debug-overlay 'face) 'flycheck-debug)
-  ;; priority lower than info level
-  (setf (get 'flycheck-debug-overlay 'priority) 80)
-  (flycheck-define-error-level 'debug
-    :overlay-category 'flycheck-debug-overlay
-    :severity -20)
-  (setq flycheck-navigation-minimum-level 'info)
-  (flycheck-define-checker cspell
-    "Cspell checker."
-    :command ("cspell" "lint" source-inplace
-              "--no-color"
-              "--no-progress"
-              "--no-summary")
-    :error-patterns
-    ((debug line-start (file-name) ":" line ":" column " - " (message) line-end))
-    :modes (text-mode
-            emacs-lisp-mode
-            haskell-mode
-            markdown-mode
-            org-mode
-            c-ts-mode
-            c++-ts-mode
-            rust-ts-mode
-            go-ts-mode
-            python-ts-mode
-            html-mode
-            js-ts-mode
-            typescript-ts-mode
-            tsx-ts-mode
-            bash-ts-mode
-            css-ts-mode
-            json-ts-mode
-            toml-ts-mode
-            yaml-ts-mode
-            dockerfile-ts-mode
-            nix-mode
-            latex-mode))
-  ;; add to the last one in case of conflicts
-  (add-to-list 'flycheck-checkers 'cspell t)
-  ;; enable it along with existing checker
-  ;; emacs-lisp -> emacs-lisp-checkdoc -> cspell
-  (flycheck-add-next-checker 'emacs-lisp-checkdoc 'cspell)
-  :config
-  (global-flycheck-mode))
-
-;; load the package manually when necessary
-;; (use-package flycheck-package)
-
 ;; make hl-line more distinguishable (for dired)
 (use-package hl-line
   :custom-face
@@ -489,60 +430,6 @@
   ;; make help window stick around
   (add-to-list 'popwin:special-display-config '(help-mode :stick t))
   (add-to-list 'popwin:special-display-config '("\\*eldoc.*\\*" :regexp t :noselect t)))
-
-(use-package sideline
-  :hook
-  ((flycheck-mode
-    flymake-mode) . sideline-mode)
-  :init
-  (setq sideline-backends-right '(sideline-flymake sideline-flycheck)))
-
-(use-package sideline-flycheck
-  :hook (flycheck-mode . sideline-flycheck-setup))
-
-
-;; (use-package lsp-mode
-;;   :commands (lsp lsp-rename)
-;;   ;; make sure the language server is available for each mode
-;;   :hook
-;;   ((c-ts-mode
-;;     c++-ts-mode
-;;     rust-ts-mode
-;;     go-ts-mode
-;;     python-ts-mode
-;;     html-mode
-;;     js-ts-mode
-;;     typescript-ts-mode
-;;     tsx-ts-mode
-;;     bash-ts-mode
-;;     css-ts-mode
-;;     json-ts-mode
-;;     toml-ts-mode
-;;     yaml-ts-mode
-;;     dockerfile-ts-mode
-;;     nix-mode
-;;     latex-mode) . lsp)
-;;   (lsp-after-initialize . (lambda ()
-;;                             ;; run cspell along with lsp checker
-;;                             (flycheck-add-next-checker 'lsp 'cspell)))
-;;   :init
-;;   (setq-default lsp-auto-guess-root t)
-;;   (setq-default lsp-enable-suggest-server-download nil)
-;;   ;; disable version log files for ts-server
-;;   (setq-default lsp-javascript-preferences-import-module-specifier "relative")
-;;   (setq-default lsp-typescript-preferences-import-module-specifier "relative")
-;;   (setq-default lsp-clients-typescript-log-verbosity "off")
-;;   (setq-default lsp-clients-typescript-preferences
-;;                 ;; use js ending for ESM import in TS
-;;                 (list :importModuleSpecifierEnding "js"))
-;;   ;; to improve lsp-mode performance
-;;   (setq-default gc-cons-threshold 100000000)
-;;   (setq-default read-process-output-max (* 1024 1024)))
-
-;; (use-package lsp-ui
-;;   :commands (lsp-ui-doc-glance)
-;;   :init
-;;   (setq-default lsp-ui-doc-position 'at-point))
 
 ;; gtd
 (defvar gtd-directory "~/.config/gtd/")
@@ -799,7 +686,9 @@ LOC can be `current' or `other'."
              with-editor-cancel)
   :hook
   (magit-pre-refresh . diff-hl-magit-pre-refresh)
-  (magit-post-refresh . diff-hl-magit-post-refresh))
+  (magit-post-refresh . diff-hl-magit-post-refresh)
+  ;; refresh magit after saving buffer
+  (after-save . magit-after-save-refresh-status))
 
 (use-package magit-todos
   :commands magit-todos-mode
