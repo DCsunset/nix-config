@@ -5,6 +5,8 @@
              modaled-define-keys
              modaled-define-state-keys
              modaled-set-default-state
+             modaled-set-main-state
+             modaled-get-main-state
              modaled-define-substate-keys
              modaled-get-substate-mode
              modaled-define-default-state
@@ -259,87 +261,82 @@ The following options are available:
             (error
              (message "%s" (error-message-string err))))))))
 
-(defmacro hx-re-hl (&rest body)
-  "Re-highlight selection after evaluating BODY forms."
-  (declare (indent defun))
-  ; unhighlight previous region first and rehighlight after body
-  `(progn
-    (hx-unhighlight)
-    ,@body
-    (hx-highlight)))
-
 (defun hx-find-char (char direction offset &optional marking)
   "Find CHAR in DIRECTION and place the cursor with OFFSET from it.
 Set mark when MARKING is t."
-  (hx-re-hl
-    (when marking
-      (hx-set-mark (point)))
-    (let ((search-fn (if (> direction 0) #'search-forward #'search-backward))
-          (search-pos (- (point) offset)))
-      (when (within-range search-pos (cons (point-min) (point-max)))
-        (forward-char (- offset))
-        (ignore-errors (funcall search-fn (string char)))
-        (forward-char offset)))))
+  (when marking
+    (hx-set-mark (point)))
+  (let ((search-fn (if (> direction 0) #'search-forward #'search-backward))
+        (search-pos (- (point) offset)))
+    (when (within-range search-pos (cons (point-min) (point-max)))
+      (forward-char (- offset))
+      (ignore-errors (funcall search-fn (string char)))
+      (forward-char offset))))
 
 (defun hx-next-word (&optional marking)
   "Move forward to next word and set mark when MARKING is t."
   (interactive)
   (ignore-errors
-    (hx-re-hl
-      ; move forward when at end of this word, start of next word, whitespace, or end of line
-      ; due to inclusive range
-      (let ((next-bounds (save-excursion (forward-char) (bounds-of-thing-at-point 'word)))
-            (bounds (bounds-of-thing-at-point 'word))
-            (next-pos (1+ (point))))
-        (when (or
-                (looking-at ".$")  ; last char of this line
-                (looking-at "[[:space:]]")  ; whitespace
-                (and bounds (= next-pos (cdr bounds)))  ; end of this word
-                (and next-bounds (= next-pos (car next-bounds))))  ; start of next word
-          (forward-char)))
-      ; skip new line chars
-      (skip-chars-forward "\n")
-      (when marking
-        (hx-set-mark (point)))
-      (let ((bounds (bounds-of-thing-at-point 'word)))
-        (if (and bounds (within-range (point) bounds))
-            ; go to end of this word if within range
-            (goto-char (cdr bounds))
-          ; go to the start of next word or end of line otherwise
-          (re-search-forward "\\<\\|$"))
-        (skip-chars-forward " \t")
-        ; backward char because of inclusive range
-        (backward-char)))))
+    ;; move forward when at end of this word, start of next word, whitespace, or end of line
+    ;; due to inclusive range
+    (let ((next-bounds (save-excursion (forward-char) (bounds-of-thing-at-point 'word)))
+          (bounds (bounds-of-thing-at-point 'word))
+          (next-pos (1+ (point))))
+      (when (or
+             (looking-at ".$")  ; last char of this line
+             (looking-at "[ \t]")  ; whitespace
+             (and bounds (= next-pos (cdr bounds)))  ; end of this word
+             (and next-bounds (= next-pos (car next-bounds))))  ; start of next word
+        (forward-char)))
+    ;; skip new line chars
+    (skip-chars-forward "\n")
+    (when marking
+      (hx-set-mark (point)))
+    (let ((bounds (bounds-of-thing-at-point 'word)))
+      (if (and bounds (within-range (point) bounds))
+          ;; go to end of this word if within range
+          (goto-char (cdr bounds))
+        ;; go to the start of next word, whitespace, or end of line
+        (re-search-forward "\\<\\|[ \t]\\|$"))
+      (skip-chars-forward " \t")
+      ;; backward char because of inclusive range
+      (backward-char))))
 
 (defun hx-previous-word (&optional marking)
   "Move backward to previous word and set mark when MARKING is t."
   (interactive)
   (ignore-errors
-    (hx-re-hl
-      ; move backward when at start of this word, end of previous word, whitespace, or start of line
-      ; due to inclusive range
-      (let ((prev-bounds (save-excursion (backward-char) (bounds-of-thing-at-point 'word)))
-            (bounds (bounds-of-thing-at-point 'word))
-            (pos (point)))
-        (when (or
-                (looking-at "^")  ; start of line
-                (looking-at "[[:space:]]")  ; whitespace
-                (and bounds (= pos (car bounds)))  ; start of this word
-                (and prev-bounds (= pos (cdr prev-bounds))))  ; end of previous word
-          (backward-char)))
-      ; skip new line chars
-      (skip-chars-backward "\n")
-      (when (looking-at "$")
-        (backward-char))
-      (when marking
-        (hx-set-mark (point)))
-      ; move to start of previous word or start of line
-      (let ((bounds (bounds-of-thing-at-point 'word)))
-        (if (and bounds (within-range (point) bounds))
-            ; go to start of this word if within range
-            (goto-char (car bounds))
-          ; go to the end of previous word or start of line otherwise
-          (re-search-backward "\\>\\|^"))))))
+    ;; move backward when at start of this word, end of previous word, whitespace, or start of line
+    ;; due to inclusive range
+    (let ((prev-bounds (save-excursion (backward-char) (bounds-of-thing-at-point 'word)))
+          (bounds (bounds-of-thing-at-point 'word))
+          (pos (point)))
+      (when (or
+             (looking-at "^")  ; start of line
+             (looking-at "[ \t]")  ; whitespace
+             (and bounds (= pos (car bounds)))  ; start of this word
+             (and prev-bounds (= pos (cdr prev-bounds))))  ; end of previous word
+        (backward-char)))
+    ;; skip new line chars
+    (skip-chars-backward "\n")
+    (when (looking-at "$")
+      (backward-char))
+    (when marking
+      (hx-set-mark (point)))
+    (when (looking-at "[ \t]")
+      (skip-chars-backward " \t")
+      ;; skip one more whitespace at point due to inclusive range
+      (when (not (looking-at "^"))
+        (backward-char)))
+    ;; move to start of previous word or start of line
+    (let ((bounds (bounds-of-thing-at-point 'word)))
+      (if (and bounds (within-range (point) bounds))
+          ;; go to start of this word if within range
+          (goto-char (car bounds))
+        ;; go to the end of previous word, whitespace or start of line
+        (re-search-backward "\\>\\|[ \t]\\|^"))
+      (when (looking-at "[ \t]")
+        (skip-chars-backward " \t")))))
 
 (defun hx-delete-word-backward ()
   "Delete a word backward without adding it to the `kill-ring'."
@@ -472,15 +469,22 @@ ARG can be one of the following:
     (backward-char 1)))
 
 (defun hx-match-surround-replace (char)
-  "Replace surrounding matching pair around current selection with CHAR pair."
+  "Replace surrounding matching pair around current selection with CHAR pair.
+If no current selection (region is one char), run `hx-match-select' first."
   (let* ((pair (or (assq char hx-matching-char-alist)
-                  (rassq char hx-matching-char-alist)
-                  (cons char char)))
-         (region (hx-region))
+                   (rassq char hx-matching-char-alist)
+                   (cons char char)))
+         (region (let ((reg (hx-region)))
+                   (if (> (cdr reg) (1+ (car reg)))
+                       reg
+                     ;; run match-select first
+                     (hx-match-select :around)
+                     (hx-region))))
          (left (char-after (car region)))
          (right (char-before (cdr region))))
-    (if (not (or (eq right (cdr (assq left hx-matching-char-alist)))
-                 (eq right left)))
+    (if (or (eq left right)
+            (not (or (eq right (cdr (assq left hx-matching-char-alist)))
+                 (eq right left))))
         (message "Current region not surrounded by matching pair")
       (goto-char (car region))
       (delete-char 1)
@@ -510,7 +514,6 @@ ARG can be one of the following:
 (defun hx--hide-popup ()
   "Hide popup window and remove it from `post-command-hook'."
   (remove-hook 'pre-command-hook 'hx--hide-popup)
-  (message "hiding")
   (call-interactively #'popwin:close-popup-window))
 
 (defun hx--hide-popup-on-next-command ()

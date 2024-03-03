@@ -86,7 +86,7 @@
         tree-sitter-elisp
       ]))
     ];
-    extraConfig = mylib.readFiles [ ./hx.el ./default.el ];
+    extraConfig = mylib.readFiles [ ./tempo.el ./hx.el ./default.el ];
   };
 
   # some config only take effects in user config instead of default.el

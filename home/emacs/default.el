@@ -111,9 +111,10 @@
   :commands global-hl-todo-mode
   :init
   (setq hl-todo-keyword-faces
-        '(("TODO" . "light sky blue")
-          ("FIXME" . "violet")
+        '(("TODO" . "red")
+          ("FIXME" . "red")
           ("BUG" . "red")
+          ("WAITING" . "violet")
           ("HACK" . "dark orange")))
   (global-hl-todo-mode))
 
@@ -440,10 +441,13 @@
               ("RET" . nil)
               ("<return>" . nil)
               ("C-w" . nil)
-              ("<escape>" . (lambda () (interactive) (company-abort) (modaled-set-default-state))))
+              ("<escape>" . (lambda () (interactive) (company-abort) (modaled-set-main-state))))
   :init
   ;; complete on 2 chars instead of 3
-  (setq-default company-minimum-prefix-length 2))
+  (setq-default company-minimum-prefix-length 2
+                ;; prevent completing with wrong cases
+                company-dabbrev-downcase nil
+                company-dabbrev-ignore-case nil))
 
 ;;; eglot LSP client
 (use-package eglot
@@ -562,6 +566,8 @@
 ;; org-mode
 (use-package org
   :commands (org-todo
+             org-entry-get
+             org-set-property
              org-refile
              org-priority
              org-insert-structure-template
@@ -612,11 +618,11 @@
 
   ;; GTD in org-mode
   (setq org-capture-templates
-        `(("i" "inbox" entry
-           (file+headline ,(gtd-file "inbox.org") "Inbox")
+        `(("ti" "gtd inbox" entry
+           (file ,(gtd-file "inbox.org"))
            "* TODO %i%?")
-          ("a" "archives" entry
-           (file+headline ,(gtd-file "archives.org") "Archives")
+          ("ta" "gtd archives" entry
+           (file ,(gtd-file "archives.org"))
            "* DONE %i%?")))
   (setq org-todo-keywords '((sequence "TODO(t)" "WAITING(w)" "SOMEDAY(s)" "|" "DONE(d)" "CANCELLED(c)")))
   (setq org-todo-keyword-faces
@@ -628,11 +634,8 @@
   (setq org-fontify-done-headline t
         org-fontify-todo-headline t)
   (setq org-refile-targets
-        `((,(gtd-file "actions.org") :maxlevel . 3)
-          (,(gtd-file "archives.org") :maxlevel . 3)))
-  (setq org-agenda-files
-        `(,(gtd-file "inbox.org")
-          ,(gtd-file "actions.org")))
+        `((,(gtd-file "actions.org") :maxlevel . 2)
+          (,(gtd-file "archives.org") :maxlevel . 2)))
   ;; save buffer after capture or refile
   (defun save-after-capture-refile ()
     (with-current-buffer (marker-buffer org-capture-last-stored-marker)
@@ -699,23 +702,32 @@ LOC can be `current' or `other'."
   (org-agenda-redo
    org-agenda-todo
    org-agenda-priority
-   org-agenda-refile))
+   org-agenda-refile)
+  :config
+  (setf (cdr (assoc 'todo org-agenda-prefix-format)) " %i %-16:c ")
+  (setq org-agenda-files
+        `(,(gtd-file "inbox.org")
+          ,(gtd-file "actions.org"))))
 
 (use-package org-super-agenda
   :commands org-super-agenda-mode
   :hook
   (org-agenda-mode . org-super-agenda-mode)
-  ;; :init
-  ;; (org-super-agenda-mode)
   :config
   (setq org-super-agenda-groups
         ;; only passed to next group if previous doesn't match
         '((:name "Inbox" :file-path "inbox\\.org\\'")
           (:todo "TODO")
-          (:todo "SOMEDAY")
-          (:todo "WAITING")))
+          (:todo "WAITING")
+          (:todo "SOMEDAY")))
   ;; disable the keymap on header
   (setq org-super-agenda-header-map (make-sparse-keymap)))
+
+(defun org-insert-category ()
+  "Insert category property with current item."
+  (interactive)
+  (let ((item (org-entry-get nil "ITEM")))
+    (org-set-property "CATEGORY" item)))
 
 ;; org-mode specific keybindings
 (modaled-define-substate "org")
@@ -729,8 +741,16 @@ LOC can be `current' or `other'."
     ("'it" . ("org insert template" . ,(hx :eval
                                          (modaled-set-state "insert")
                                          org-insert-structure-template)))
-    ("'ii" . ("org create id" . org-id-get-create))
+    ("'ii" . ("org insert id" . org-id-get-create))
+    ("'ic" . ("org insert category" . org-insert-category))
     ("'l" . ("org toggle link display" . org-toggle-link-display))
+    ("'c" . ("org capture" . org-capture))
+    ("'<" . ("org promote" . ,(hx :region :eval org-do-promote)))
+    ("'>" . ("org demote" . ,(hx :region :eval org-do-demote)))
+    ("'J" . ("org promote subtree" . ,(hx :region :eval org-promote-subtree)))
+    ("':" . ("org demote subtree" . ,(hx :region :eval org-demote-subtree)))
+    ("'L" . ("org promote subtree" . ,(hx :region :eval org-move-subtree-up)))
+    ("'K" . ("org demote subtree" . ,(hx :region :eval org-move-subtree-down)))
     ;; org-gtd
     ("'t" . ("org todo" . ,(hx :region :eval org-todo gtd-save)))
     ("'r" . ("org refile" . ,(hx :region :eval org-refile gtd-save)))
@@ -758,10 +778,6 @@ LOC can be `current' or `other'."
 ;; for note searching
 (use-package xeft
   :commands (xeft)
-  :hook
-  ; set init state
-  (xeft-mode . (lambda ()
-                 (modaled-set-state "insert")))
   :init
   (setq xeft-directory note-directory)
   (setq xeft-database "~/.config/emacs/xeft/db"))
@@ -803,6 +819,8 @@ LOC can be `current' or `other'."
     ("F" . ("pull changes" . magit-pull))
     ("d" . ("diff" . magit-diff))
     ("D" . ("discard" . magit-discard))
+    ("r" . ("refresh" . magit-refresh))
+    ("R" . ("refresh all" . magit-refresh-all))
     ("c" . ("commit" . magit-commit))))
 (modaled-enable-substate-on-state-change
   "magit-status"
@@ -815,7 +833,6 @@ LOC can be `current' or `other'."
   :commands (vterm-reset-cursor-point vterm--self-insert)
   :hook
   (vterm-mode . (lambda ()
-                  (modaled-set-state "insert")
                   ;; turn off trailing whitespaces highlighting
                   (setq show-trailing-whitespace nil))))
 ;; vterm specific keybindings
@@ -988,7 +1005,7 @@ Should be called only before entering multiple-cursors-mode."
   :states '("select")
   :bind
   ;; state changes
-  `(("s" . ("exit SELECT state" . modaled-set-default-state))))
+  `(("s" . ("exit SELECT state" . modaled-set-main-state))))
 
 ;; Common keybindings for normal and select states
 ;; Note:
@@ -1001,12 +1018,12 @@ Should be called only before entering multiple-cursors-mode."
     (";" . ("right" . ,(hx :re-sel :eval forward-char)))
     ("l" . ("up" . ,(hx :re-sel :eval previous-line)))
     ("k" . ("down" . ,(hx :re-sel :eval next-line)))
-    ("w" . ("next word" . ,(hx :eval (hx-next-word (equal modaled-state "normal")))))
-    ("b" . ("prev word" . ,(hx :eval (hx-previous-word (equal modaled-state "normal")))))
-    ("f" . ("find next char" . ,(hx :arg "c" :eval (hx-find-char (car args) +1 -1 (equal modaled-state "normal")))))
-    ("t" . ("find till next char" . ,(hx :arg "c" :eval (hx-find-char (car args) +1 -2 (equal modaled-state "normal")))))
-    ("F" . ("find prev char" . ,(hx :arg "c" :eval (hx-find-char (car args) -1 0 (equal modaled-state "normal")))))
-    ("T" . ("find till prev char" . ,(hx :arg "c" :eval (hx-find-char (car args) -1 1 (equal modaled-state "normal")))))
+    ("w" . ("next word" . ,(hx :re-hl :eval (hx-next-word (equal modaled-state "normal")))))
+    ("b" . ("prev word" . ,(hx :re-hl :eval (hx-previous-word (equal modaled-state "normal")))))
+    ("f" . ("find next char" . ,(hx :arg "c" :re-hl :eval (hx-find-char (car args) +1 -1 (equal modaled-state "normal")))))
+    ("t" . ("find till next char" . ,(hx :arg "c" :re-hl :eval (hx-find-char (car args) +1 -2 (equal modaled-state "normal")))))
+    ("F" . ("find prev char" . ,(hx :arg "c" :re-hl :eval (hx-find-char (car args) -1 0 (equal modaled-state "normal")))))
+    ("T" . ("find till prev char" . ,(hx :arg "c" :re-hl :eval (hx-find-char (car args) -1 1 (equal modaled-state "normal")))))
     (,(kbd "C-u") . ("scroll up" . ,(hx :re-sel :eval (funcall-interactively #'previous-line 10))))
     (,(kbd "C-d") . ("scroll down" . ,(hx :re-sel :eval (funcall-interactively #'next-line 10))))
     ;; goto mode
@@ -1025,8 +1042,8 @@ Should be called only before entering multiple-cursors-mode."
     ("m;" . ("end of current pair" . ,(hx  :re-sel :eval sp-end-of-sexp)))
     ("msa" . ("select around current pair" . ,(hx :re-hl :eval (hx-match-select :around))))
     ("msi" . ("select inside current pair" . ,(hx :re-hl :eval (hx-match-select :inside))))
-    ("ma" . ("surround with pair" . ,(hx :arg "c" :re-hl :eval modaled-set-default-state (hx-match-surround-add (car args)))))
-    ("mr" . ("replace surrounding pair" . ,(hx :arg "c" :re-hl :eval modaled-set-default-state (hx-match-surround-replace (car args)))))
+    ("ma" . ("surround with pair" . ,(hx :arg "c" :re-hl :eval modaled-set-main-state (hx-match-surround-add (car args)))))
+    ("mr" . ("replace surrounding pair" . ,(hx :arg "c" :re-hl :eval modaled-set-main-state (hx-match-surround-replace (car args)))))
     ;; C-i is the same as TAB for kbd and in terminal
     (,(kbd "C-i") . ("jump forward" . xref-go-forward))
     (,(kbd "C-o") . ("jump backward" . xref-go-back))
@@ -1037,9 +1054,9 @@ Should be called only before entering multiple-cursors-mode."
     ("A" . ("insert at end of line" . ,(hx :eval hx-no-sel (modaled-set-state "insert") end-of-line)))
     ("o" . ("insert below" . ,(hx :eval hx-no-sel (modaled-set-state "insert") end-of-line newline-and-indent)))
     ("O" . ("insert above" . ,(hx :eval hx-no-sel (modaled-set-state "insert") beginning-of-line newline-and-indent (forward-line -1) indent-according-to-mode)))
-    ("r" . ("replace" . ,(hx :arg "c" :eval hx-no-sel modaled-set-default-state (hx-region-replace (car args)))))
-    ("y" . ("copy" . ,(hx :eval modaled-set-default-state (hx-region-apply #'kill-ring-save))))
-    ("d" . ("delete" . ,(hx :eval modaled-set-default-state (hx-region-apply #'delete-region) hx-no-sel)))
+    ("r" . ("replace" . ,(hx :arg "c" :eval hx-no-sel modaled-set-main-state (hx-region-replace (car args)))))
+    ("y" . ("copy" . ,(hx :eval modaled-set-main-state (hx-region-apply #'kill-ring-save))))
+    ("d" . ("delete" . ,(hx :eval modaled-set-main-state (hx-region-apply #'delete-region) hx-no-sel)))
     ("e" . ("edit" . ,(hx :eval (modaled-set-state "insert") (hx-region-apply #'delete-region) hx-no-sel)))
     ("P" . ("paste before" . ,(hx :eval (hx-paste (current-kill 0 t) -1) hx-no-sel)))
     ("p" . ("paste after" . ,(hx :eval (hx-paste (current-kill 0 t) +1) hx-no-sel)))
@@ -1059,7 +1076,7 @@ Should be called only before entering multiple-cursors-mode."
     ;; space mode
     (" P" . ("clipboard paste before" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) -1) hx-no-sel)))
     (" p" . ("clipboard paste after" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) +1) hx-no-sel)))
-    (" y" . ("copy to clipboard" . ,(hx :eval modaled-set-default-state (xclip-set-selection 'clipboard (hx-region-string)))))
+    (" y" . ("copy to clipboard" . ,(hx :eval modaled-set-main-state (xclip-set-selection 'clipboard (hx-region-string)))))
     (" f" . ("find file (projectile)" . projectile-find-file))
     (" F" . ("find file (dired)" . find-file))
     (" b" . ("switch to buffer" . switch-to-buffer))
@@ -1078,7 +1095,7 @@ Should be called only before entering multiple-cursors-mode."
     (" tl" . ("gtd list" . org-todo-list))
     (" ti" . ("gtd inbox" . ,(hx :eval (find-file (gtd-file "inbox.org")))))
     (" ta" . ("gtd actions" . ,(hx :eval (find-file (gtd-file "actions.org")))))
-    (" tc" . ("gtd capture" . org-capture))
+    (" tc" . ("gtd capture" . ,(hx :eval (org-capture nil "ti"))))
     ;; notes (org-roam & xeft)
     (" nf" . ("note find" . org-roam-node-find))
     (" ns" . ("note search" . xeft))
@@ -1123,6 +1140,9 @@ Should be called only before entering multiple-cursors-mode."
   :bind
   `((,(kbd "C-w") . ("delete word backward" . hx-delete-word-backward))
     (,(kbd "M-i") . ("code suggestion (LSP)" . company-manual-begin))
+    ;; set tempo-match-finder temporarily to prevent conflicts
+    (,(kbd "M-t") . ("tempo complete" . ,(hx :eval (let ((tempo-match-finder hx-tempo-match-finder))
+                                                     (tempo-complete-tag)))))
     ;; this makes pasting work in GUI
     (,(kbd "C-V") . ("paste from clipboard" . ,(hx :eval (insert (xclip-get-selection 'clipboard)))))))
 ;; (add-hook
@@ -1164,7 +1184,7 @@ Should be called only before entering multiple-cursors-mode."
 (modaled-define-keys
   :states '("major" "normal" "select" "insert")
   :bind
-  `(([escape] . ("default state" . ,(hx :eval modaled-set-default-state hx-format-blank-line hx-no-sel)))
+  `(([escape] . ("main state" . ,(hx :eval modaled-set-main-state hx-format-blank-line hx-no-sel)))
     (,(kbd "M-`") . ("toggle vterm" . vterm-toggle))
     (,(kbd "M-h") . ("split horizontally" . ,(hx :eval split-window-horizontally other-window)))
     (,(kbd "M-v") . ("split vertically" . ,(hx :eval split-window-vertically other-window)))
@@ -1189,7 +1209,11 @@ Should be called only before entering multiple-cursors-mode."
 
 (modaled-define-default-state
   '("major" dired-mode)
+  '("insert" vterm-mode xeft-mode)
   '("normal"))
+
+(setq modaled-main-state-alist
+      '(((vterm-mode xeft-mode) . "normal")))
 
 ;; translate terminal \\e to [escape]
 (hx-esc-mode 1)
