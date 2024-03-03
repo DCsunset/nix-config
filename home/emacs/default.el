@@ -1008,8 +1008,8 @@ Should be called only before entering multiple-cursors-mode."
     ("]l" . ("into list (TS)" . combobulate-navigate-down-list-maybe))
     ("[ms" . ("move sibling up (TS)" . combobulate-drag-up))
     ("]ms" . ("move sibling down (TS)" . combobulate-drag-down))
-    ("[d" . ("previous diagnostic" . previous-error))
-    ("]d" . ("next diagnostic" . next-error))
+    ("[d" . ("prev diagnostic" . ,(hx :eval (flymake-goto-prev-error nil '(:error :warning) t))))
+    ("]d" . ("next diagnostic" . ,(hx :eval (flymake-goto-next-error nil '(:error :warning) t))))
     ;; misc
     ("!" . ("run shell command" . shell-command))
     ("|" . ("eval expr" . eval-expression))
