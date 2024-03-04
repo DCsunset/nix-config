@@ -211,34 +211,6 @@
                   (fix-centaur-tabs)))
               (fix-centaur-tabs)))
 
-;; mode line
-(use-package nerd-icons)
-(use-package doom-modeline
-  :commands (doom-modeline-mode
-             doom-modeline-def-modeline
-             doom-modeline-set-modeline
-             doom-modeline-def-segment)
-  :demand t
-  :config
-  (doom-modeline-def-segment modaled
-    "Display modaled states."
-    (when (bound-and-true-p modaled-state)
-      (propertize
-        (cond ((equal modaled-state "normal") "N")
-              ((equal modaled-state "insert") "I")
-              ((equal modaled-state "select") "S")
-              ((equal modaled-state "major") "M"))
-        'face (cons 'bold t))))
-
-  (doom-modeline-def-modeline 'my-modeline
-    '(bar workspace-name window-number modaled matches follow buffer-info remote-host buffer-position word-count parrot selection-info)
-    '(compilation objed-state misc-info persp-name battery grip irc mu4e gnus github debug repl lsp minor-modes input-method indent-info buffer-encoding major-mode process vcs checker time))
-
-  (add-hook 'doom-modeline-mode-hook
-            (lambda ()
-              (doom-modeline-set-modeline 'my-modeline 'default)))
-  (doom-modeline-mode 1))
-
 ;; make hl-line more distinguishable (for dired)
 (use-package hl-line
   :custom-face

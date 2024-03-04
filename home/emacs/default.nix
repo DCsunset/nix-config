@@ -24,7 +24,6 @@
       xclip
       modus-themes
       centaur-tabs
-      doom-modeline
       nerd-icons
       nerd-icons-dired
       nerd-icons-completion
@@ -84,7 +83,7 @@
         tree-sitter-elisp
       ]))
     ];
-    extraConfig = mylib.readFiles [ ./tempo.el ./hx.el ./default.el ];
+    extraConfig = mylib.readFiles [ ./modeline.el ./tempo.el ./check.el ./hx.el ./default.el ];
   };
 
   # some config only take effects in user config instead of default.el
