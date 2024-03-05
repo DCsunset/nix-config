@@ -24,12 +24,6 @@
   (interactive)
   (save-some-buffers t (lambda ()
                          (file-in-directory-p buffer-file-name gtd-directory))))
-(defun gtd-action (action)
-  "Return a fn to perform a gtd ACTION and save buffers."
-  (lambda ()
-    (interactive)
-    (call-interactively action)
-    (gtd-save)))
 
 ;; org-mode
 (use-package org
@@ -122,16 +116,16 @@ LOC can be `current' or `other'."
     (org-open-at-point)))
 
 (use-package org-agenda
-  :commands
-  (org-agenda-redo
-   org-agenda-todo
-   org-agenda-priority
-   org-agenda-refile)
+  :commands (org-agenda-redo
+             org-agenda-todo
+             org-agenda-priority
+             org-agenda-refile)
   :config
   (setf (cdr (assoc 'todo org-agenda-prefix-format)) " %i %-16:c ")
   (setq org-agenda-files
         `(,(gtd-file "inbox.org")
           ,(gtd-file "actions.org"))))
+
 
 (use-package org-super-agenda
   :commands org-super-agenda-mode
@@ -200,9 +194,8 @@ LOC can be `current' or `other'."
   (setq xeft-database "~/.config/emacs/xeft/db"))
 
 
-;;; keybindings
 
-;; ;; org-mode specific keybindings
+;; org-mode specific keybindings
 (modaled-define-substate "org")
 (modaled-define-keys
   :substates '("org")
@@ -239,10 +232,10 @@ LOC can be `current' or `other'."
 (modaled-define-keys
   :substates '("org-agenda")
   :bind
-  `(("r" . ("rebuild agenda view" . ,(gtd-action #'org-agenda-redo)))
-    ("'t" . ("org todo" . ,(gtd-action #'org-agenda-todo)))
-    ("'p" . ("org priority" . ,(gtd-action #'org-agenda-priority)))
-    ("'r" . ("org refile" . ,(gtd-action #'org-agenda-refile)))))
+  `(("r" . ("rebuild agenda view" . org-agenda-redo))
+    ("'t" . ("org todo" . ,(hx :eval org-agenda-todo gtd-save)))
+    ("'p" . ("org priority" . ,(hx :eval org-agenda-priority gtd-save)))
+    ("'r" . ("org refile" . ,(hx :eval org-agenda-refile gtd-save)))))
 (modaled-enable-substate-on-state-change
   "org-agenda"
   :states '("normal" "select")
