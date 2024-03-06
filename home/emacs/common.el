@@ -63,7 +63,8 @@
 (use-package nerd-icons
   :command (nerd-icons-codicon
             nerd-icons-faicon
-            nerd-icons-octicon))
+            nerd-icons-octicon
+            nerd-icons-devicon))
 
 (use-package modaled
   :commands (modaled-set-state

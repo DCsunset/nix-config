@@ -14,19 +14,56 @@
   "Define mouse map for modeline.
 CMD1 for mouse-1 and CMD3 for mouse-3."
   (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line down-mouse-1] cmd1)
-    (define-key map [mode-line down-mouse-3] cmd3)
+    (define-key map [mode-line mouse-1] cmd1)
+    (define-key map [mode-line mouse-3] cmd3)
     map))
 
+(defun surround-spaces (str)
+  "Surround STR with spaces."
+  (format " %s " str))
 
 ;; modaled
 (my-modeline-def-construct my-modeline-modaled
-  (propertize (capitalize (substring modaled-state 0 1))
+  (propertize (surround-spaces (capitalize (substring modaled-state 0 1)))
               'face 'bold))
 
 ;; major mode
 (my-modeline-def-construct my-modeline-major-mode
-  (capitalize (string-remove-suffix "-mode" (symbol-name major-mode))))
+  (propertize (surround-spaces
+               (capitalize (string-remove-suffix "-mode" (symbol-name major-mode))))
+              'face 'bold))
+
+;; encoding
+(defvar my-modeline--encoding-map
+  (my-modeline-def-map nil #'mode-line-change-eol))
+
+(my-modeline-def-construct my-modeline-encoding
+  (let* ((eol (coding-system-eol-type buffer-file-coding-system))
+         (sys (coding-system-plist buffer-file-coding-system))
+         (name (upcase (let ((ns (plist-get sys :name)))
+                         (if (and (eq ns 'undecided)
+                                  (plist-get sys :ascii-compatible-p))
+                             "ascii"
+                           (string-remove-prefix "prefer-" (symbol-name ns)))))))
+    (list
+     " "
+     (propertize (pcase eol
+                   (0 "LF")
+                   (1 "CRLF")
+                   (2 "CR")
+                   (_ "AUTO"))
+                 'help-echo (format "End of line: %s\nmouse-3: Cycle"
+                                    (pcase eol
+                                      (0 "Unix LF")
+                                      (1 "DOS CRLF")
+                                      (2 "Mac CR")
+                                      (_ "Auto")))
+                 'local-map my-modeline--encoding-map)
+     " "
+     (propertize name
+                 'help-echo 'mode-line-mule-info-help-echo
+                 'local-map mode-line-coding-system-map)
+     " ")))
 
 ;; buffer
 (my-modeline-def-construct my-modeline-buffer
@@ -38,7 +75,7 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
          (concat (nerd-icons-faicon "nf-fa-lock") " ")
        "")
      ;; name
-     (propertize name
+     (propertize (surround-spaces name)
                  'face (when (buffer-modified-p)
                          '((t :slant italic :weight bold)))
                  'help-echo buffer-file-name))))
@@ -67,35 +104,52 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
 
 (my-modeline-def-construct my-modeline-flymake
   (list
-   (propertize (nerd-icons-codicon "nf-cod-error")
-               'face 'error
-               'local-map my-modeline--flymake-error-map)
    " "
-   (my-modeline--flymake-count :error)
+   (propertize
+    (concat (propertize (nerd-icons-codicon "nf-cod-error")
+                        'face 'error)
+               " "
+               (my-modeline--flymake-count :error))
+    'local-map my-modeline--flymake-error-map)
    " "
-   (propertize (nerd-icons-codicon "nf-cod-warning")
-               'face 'warning
-               'local-map my-modeline--flymake-warning-map)
+   (propertize
+    (concat (propertize (nerd-icons-codicon "nf-cod-warning")
+                        'face 'warning)
+               " "
+               (my-modeline--flymake-count :warning))
+    'local-map my-modeline--flymake-warning-map)
    " "
-   (my-modeline--flymake-count :warning)
-   " "
-   (propertize (nerd-icons-codicon "nf-cod-info")
-               'local-map my-modeline--flymake-note-map)
-   " "
-   (my-modeline--flymake-count :note)))
+   (propertize
+    (concat (nerd-icons-codicon "nf-cod-info")
+            " "
+            (my-modeline--flymake-count :note))
+    'local-map my-modeline--flymake-note-map)
+   " "))
+
+;; git
+(my-modeline-def-construct my-modeline-git
+  ;; TODO run git status --porcelain
+  (when (and vc-mode buffer-file-name)
+    (let* ((status nil)
+           (icon (nerd-icons-devicon (if (null status)
+                                         "nf-dev-git_branch"
+                                       "nf-dev-git_compare")))
+           (branch (car (vc-git-branches))))
+      (propertize
+       (surround-spaces (concat icon " " branch))
+       'face '((t :foreground "sky blue"))))))
 
 ;; must use setq-default as it will become buffer local when set
 (setq-default mode-line-format
               '("%e"
-                " "
                 my-modeline-modaled
-                " "
                 my-modeline-buffer
 
                 "        "  ; FIXME: remove this after Emacs 30
                 mode-line-format-right-align  ; emacs 30
 
                 my-modeline-flymake
-                "  "
+                my-modeline-encoding
+                my-modeline-git
                 my-modeline-major-mode))
 
