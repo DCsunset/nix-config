@@ -40,14 +40,8 @@
       diff-hl
       magit
       magit-todos
-      ### deps for magit-todos
-      async
       dash
-      f
       hl-todo
-      pcre2el
-      s
-      ###
       markdown-mode
       nushell-mode
       org

@@ -5,13 +5,27 @@ rec {
   # read all modules in a directory as a list
   # dir should be a path
   readModules = dir: map
-    (m: dir + "//${m}")
+    (m: dir + "/${m}")
     (builtins.attrNames (
       filterAttrs
         # if it's a directory, it should contain default.nix
         (n: v: v == "directory" || strings.hasSuffix ".nix" n)
         (builtins.readDir dir)
     ));
+
+  # list names of all subdirectories in a dir
+  listSubdirNames = dir:
+    builtins.attrNames (
+      filterAttrs
+        (n: v: v == "directory")
+        (builtins.readDir dir)
+    );
+
+  # list paths of all subdirectories in a dir
+  listSubdirPaths = dir: map (x: dir + "/${x}") (listSubdirNames dir);
+
+  # import all modules in subdirs
+  importSubdirs = dir: map import (listSubdirPaths dir);
 
   # read multiple files and concat them into one string by newlines
   readFiles = files: concatStringsSep "\n" (
@@ -27,63 +41,35 @@ rec {
 
   # for debug
   # importIfExist = paths: paths;
-  getMachineConfig = machine:
-    import (../machines + "/${machine}");
 
-  # import preset modules and machine-specific module
-  importPresets = machine: let
-    cfg = getMachineConfig machine;
-    presets = mapAttrsToList (n: v: import (../presets + "/${n}") v) cfg.presets;
-  in {
-    os = map (p: attrByPath ["os"] {} p) (presets ++ [ cfg ]);
-    home = map (p: attrByPath ["home"] {} p) (presets ++ [ cfg ]);
-  };
-
-  # return a list of files to import for nixos
-  importOsPresets = machine: let
-    cfg = getMachineConfig machine;
-  in importIfExist (
-    (map (p: ../presets + "/${p}/os.nix") cfg.presets)
-    ++ [ (../machines + "/${machine}/os.nix") ]
-  );
-
-  # return a list of files to import for home-manager
-  importHomePresets = machine: let
-    cfg = getMachineConfig machine;
-  in importIfExist (
-    map (p: ../presets + "/${p}/home.nix") cfg.presets
-    ++ [ (../machines + "/${machine}/home.nix") ]
-  );
-
-  # Covert ipv4 subnet/len to gateway or gateway/len
-  ipv4Gateway = subnet: withLen: let
-    split = splitString "/" subnet;
-    p = builtins.elemAt split 0;
-    l = builtins.elemAt split 1;
-    # replace .0 with .1)
-    gateway = (removeSuffix ".0" p) + ".1";
-  in (
-    if withLen then "${gateway}/${l}" else gateway
-  );
-
-  # Parse ip and len from format ip/len
+  # Parse ip and len from format addr/len
   parseIp = subnet: let
     split = splitString "/" subnet;
-    ip = builtins.elemAt split 0;
+    addr = builtins.elemAt split 0;
     len = builtins.elemAt split 1;
   in {
-    inherit ip;
-    len = toInt len;
+    inherit addr len;
   };
 
-  # Covert ipv4 subnet/len to prefix like 10.0.0. (must end with .0)
+  # Convert ipv4 subnet/len or subnet to prefix like 10.0.0. (must end with .0)
   ipv4Prefix = subnet: removeSuffix "0" (builtins.elemAt (splitString "/" subnet) 0);
 
   # Use the prefix as gateway (without len) as it's not a special addr in IPv6
-  # Covert ipv6 subnet/len to prefix like 10.0.0. (must end with ::)
+  # Convert ipv6 subnet/len to prefix like fdxx:: (must end with ::)
   ipv6Prefix = subnet: builtins.elemAt (splitString "/" subnet) 0;
 
-  isIpv4Addr = addr: (builtins.match ''[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(/[0-9]+)?'' addr) != null;
+  # Append a suffix to ipv4 subnet that ends with x.x.x.0/xx (len is kept)
+  ipv4Append = subset: suffix: let
+    ip = parseIp subset;
+  in "${ipv4Prefix ip.addr}${suffix}/${ip.len}";
+
+  # Append a suffix to ipv6 subnet that ends with ::/xx (len is kept)
+  ipv6Append = subset: suffix: let
+    ip = parseIp subset;
+  in "${ip.addr}${suffix}/${ip.len}";
+
+  # Check if it is ipv4 with optional len or optional port
+  isIpv4 = addr: (builtins.match ''[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+((/[0-9]+)|(:[0-9]+))?'' addr) != null;
 
   # command to generate firejail opions to whitelist only the nix closure
   firejailNixClosure = pkgs: path: cmdLine: ''
@@ -110,5 +96,39 @@ rec {
       ${extraOptions} \
       ${command}
   '';
+
+  findUdevRuleByName = name: udevRules:
+    findFirst (x: x ? "name" && x.name == name) null udevRules;
+
+  sandboxServiceConfig = {
+    PrivateTmp = true;
+    PrivateDevices = true;
+    PrivateIPC = true;
+    PrivateUsers = true;
+    ProtectHostname = true;
+    ProtectHome = true;
+    ProtectClock = true;
+    ProtectProc = "invisible";
+    ProtectKernelTunables = true;
+    ProtectKernelModules = true;
+    ProtectKernelLogs = true;
+    ProtectControlGroups = true;
+    NoNewPrivileges = true;
+    RestrictSUIDSGID = true;
+    RestrictRealtime = true;
+    LockPersonality = true;
+    # remove all capabilities
+    CapabilityBoundingSet = [ "" ];
+    InaccessiblePaths = [ "/keys" "/mnt" "/data" "/boot" ];
+    TemporaryFileSystem = [ "/var" "/run" "/etc" ];
+    # For DNS and TLS
+    BindReadOnlyPaths = [
+      "/etc/ssl"
+      "/etc/static/ssl"
+      "/etc/pki"
+      "/etc/static/pki"
+      "/etc/resolv.conf"
+    ];
+  };
 }
 
