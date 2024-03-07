@@ -22,18 +22,18 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
   "Surround STR with spaces."
   (format " %s " str))
 
-;; modaled
+;;; modaled
 (my-modeline-def-construct my-modeline-modaled
   (propertize (surround-spaces (capitalize (substring modaled-state 0 1)))
-              'face 'bold))
+              'face '((t :weight bold :background "slate blue"))))
 
-;; major mode
+;;; major mode
 (my-modeline-def-construct my-modeline-major-mode
   (propertize (surround-spaces
                (capitalize (string-remove-suffix "-mode" (symbol-name major-mode))))
               'face 'bold))
 
-;; encoding
+;;; encoding
 (defvar my-modeline--encoding-map
   (my-modeline-def-map nil #'mode-line-change-eol))
 
@@ -65,7 +65,7 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
                  'local-map mode-line-coding-system-map)
      " ")))
 
-;; buffer
+;;; buffer
 (my-modeline-def-construct my-modeline-buffer
   ;; TODO: truncate path for file if necessary
   (let ((name (buffer-name)))
@@ -80,7 +80,7 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
                          '((t :slant italic :weight bold)))
                  'help-echo buffer-file-name))))
 
-;; flymake
+;;; flymake
 (defun my-modeline--flymake-count (type)
   "Count number of flymake errors for specific TYPE."
   (number-to-string
@@ -126,19 +126,44 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
     'local-map my-modeline--flymake-note-map)
    " "))
 
-;; git
-(my-modeline-def-construct my-modeline-git
-  ;; TODO run git status --porcelain
-  (when (and vc-mode buffer-file-name)
-    (let* ((status nil)
-           (icon (nerd-icons-devicon (if (null status)
-                                         "nf-dev-git_branch"
-                                       "nf-dev-git_compare")))
-           (branch (car (vc-git-branches))))
-      (propertize
-       (surround-spaces (concat icon " " branch))
-       'face '((t :foreground "sky blue"))))))
+;;; git
+(defvar-local my-modeline--git-info nil
+  "A list of (dirty branch); use a variable for caching.")
+(defun my-modeline--update-git-info ()
+  "Update cached git info."
+  (setq my-modeline--git-info
+        (when (and vc-mode buffer-file-name)
+          (let ((status (shell-command-to-string "git status --porcelain")))
+            (list
+             ;; dirty
+             (not (string-empty-p status))
+             ;; branch
+             (car (vc-git-branches)))))))
+;; update info only on file init and save for better performance
+;; need to add it to the end to make sure vc-mode is updated first
+(add-hook 'find-file-hook #'my-modeline--update-git-info 100)
+(add-hook 'after-save-hook #'my-modeline--update-git-info 100)
 
+(defvar my-modeline--git-map
+  (my-modeline-def-map #'magit-status nil))
+
+(my-modeline-def-construct my-modeline-git
+  (pcase my-modeline--git-info
+    (`(,dirty ,branch)
+     (propertize
+      (surround-spaces
+       (concat (nerd-icons-devicon (if dirty
+                                       "nf-dev-git_compare"
+                                     "nf-dev-git_branch"))
+               " "
+               branch))
+      'face '((t :foreground "light sky blue"))
+      'help-echo (format "Git status: %s\nmoduse-1: Open magit"
+                         (if dirty "dirty" "clean"))
+      'local-map my-modeline--git-map))))
+
+
+;;; mode line format
 ;; must use setq-default as it will become buffer local when set
 (setq-default mode-line-format
               '("%e"
