@@ -413,6 +413,13 @@ Default is 1 which means the nearest level."
             (goto-char beg)
           (goto-char end))))))
 
+(defun hx-match-tag ()
+  "Go to matching tag if in jtsx major mode."
+  (interactive)
+  (pcase major-mode
+    ((guard (memq major-mode '(jtsx-jsx-mode jtsx-tsx-mode)))
+     (jtsx-jump-jsx-element-tag-dwim))))
+
 (defun hx-match-select (arg)
   "Selete current matching pair.
 
@@ -521,41 +528,99 @@ If no current selection (region is one char), run `hx-match-select' first."
 (defun hx-toggle-visibility ()
   "Toggle visibility."
   (interactive)
-  (cond
-   ((eq major-mode 'org-mode) (org-cycle))
-   ((eq major-mode 'magit-status-mode) (call-interactively #'magit-section-toggle))))
+  (pcase major-mode
+   ('org-mode (org-cycle))
+   ('magit-status-mode (call-interactively #'magit-section-toggle))))
 
-(defun hx-previous ()
-  "Previous in context."
-  (interactive)
-  (cond
-   ((eq major-mode 'org-mode) (org-previous-visible-heading 1))
-   ((eq major-mode 'magit-status-mode) (magit-section-backward))
-   (t (combobulate-navigate-logical-previous))))
 
-(defun hx-next ()
-  "Next in context."
-  (interactive)
-  (cond
-   ((eq major-mode 'org-mode) (org-next-visible-heading 1))
-   ((eq major-mode 'magit-status-mode) (magit-section-forward))
-   (t (combobulate-navigate-logical-next))))
+;; structural movement
 
-(defun hx-previous-sibling ()
-  "Previous sibling in context."
+(defun hx-struct-prev ()
+  "Move to nearest prev structure."
   (interactive)
-  (cond
-   ((eq major-mode 'org-mode) (org-backward-heading-same-level 1))
-   ((eq major-mode 'magit-status-mode) (magit-section-backward-sibling))
-   (t (combobulate-navigate-previous))))
+  (pcase major-mode
+   ('org-mode (org-previous-visible-heading 1))
+   ('magit-status-mode (magit-section-backward))
+   (_ (combobulate-navigate-logical-previous))))
 
-(defun hx-next-sibling ()
-  "Next sibling in context."
+(defun hx-struct-next ()
+  "Move to nearest next structure."
   (interactive)
-  (cond
-   ((eq major-mode 'org-mode) (org-forward-heading-same-level 1))
-   ((eq major-mode 'magit-status-mode) (magit-section-forward-sibling))
-   (t (combobulate-navigate-next))))
+  (pcase major-mode
+   ('org-mode (org-next-visible-heading 1))
+   ('magit-status-mode (magit-section-forward))
+   (_ (combobulate-navigate-logical-next))))
+
+(defun hx-struct-backward  ()
+  "Move backward in sibling."
+  (interactive)
+  (pcase major-mode
+   ('org-mode (org-backward-heading-same-level 1))
+   ('magit-status-mode (magit-section-backward-sibling))
+   (_ (combobulate-navigate-previous))))
+
+(defun hx-struct-forward ()
+  "Move forward in sibling."
+  (interactive)
+  (pcase major-mode
+   ('org-mode (org-forward-heading-same-level 1))
+   ('magit-status-mode (magit-section-forward-sibling))
+   (_ (combobulate-navigate-next))))
+
+(defun hx-struct-up ()
+  "Move up in hierarchy."
+  (interactive)
+  (combobulate-navigate-up-list-maybe))
+
+(defun hx-struct-down ()
+  "Move up in hierarchy."
+  (interactive)
+  (combobulate-navigate-down-list-maybe))
+
+(defun hx-struct-drag-forward ()
+  "Drag forward in sibling."
+  (interactive)
+  (pcase major-mode
+    ((guard (memq major-mode '(jtsx-jsx-mode jtsx-tsx-mode)))
+     (jtsx-move-jsx-element-forward))))
+
+(defun hx-struct-drag-backward ()
+  "Drag forward in sibling."
+  (interactive)
+  (pcase major-mode
+    ((guard (memq major-mode '(jtsx-jsx-mode jtsx-tsx-mode)))
+     (jtsx-move-jsx-element-backward))))
+
+(defun hx-struct-drag-up ()
+  "Drag up in hierarchy."
+  (interactive)
+  (pcase major-mode
+    ((guard (memq major-mode '(jtsx-jsx-mode jtsx-tsx-mode)))
+     (jtsx-move-jsx-element-step-in-backward))
+    (_ (combobulate-drag-up))))
+
+(defun hx-struct-drag-down ()
+  "Drag up in hierarchy."
+  (interactive)
+  (pcase major-mode
+    ((guard (memq major-mode '(jtsx-jsx-mode jtsx-tsx-mode)))
+     (jtsx-move-jsx-element-step-in-forward))
+    (_ (combobulate-drag-down))))
+
+(defun hx-struct-wrap ()
+  "Wrap struct with a new one."
+  (interactive)
+  (pcase major-mode
+    ((guard (memq major-mode '(jtsx-jsx-mode jtsx-tsx-mode)))
+     (jtsx-wrap-in-jsx-element))))
+
+(defun hx-struct-delete ()
+  "Delete struct."
+  (interactive)
+  (pcase major-mode
+    ((guard (memq major-mode '(jtsx-jsx-mode jtsx-tsx-mode)))
+     (jtsx-delete-jsx-node))
+    (_ (combobulate-kill-node-dwim))))
 
 
 ;;; multiple cursors
@@ -605,13 +670,12 @@ Should be called only before entering multiple-cursors-mode."
   (add-to-list 'mc/cursor-specific-vars 'hx--mark))
 
 
-
 ;;; keybindings
 
 (modaled-define-keys
   :states '("normal")
   :bind
-  `(("s" . ("enable SELECT state" . ,(hx :eval (modaled-set-state "select"))))
+  `(("v" . ("enable SELECT state" . ,(hx :eval (modaled-set-state "select"))))
     ;; search (select after search)
     ("/" . ("search forward" . ,(hx :re-hl :eval isearch-forward-regexp backward-char (hx-set-mark isearch-other-end))))
     ("?" . ("search backward" . ,(hx :re-hl :eval isearch-backward-regexp (hx-set-mark (1- isearch-other-end)))))
@@ -619,15 +683,6 @@ Should be called only before entering multiple-cursors-mode."
     ("N" . ("prev match" . ,(hx :re-hl :eval isearch-repeat-backward (hx-set-mark (1- isearch-other-end)) isearch-exit)))
     ("*" . ("search selection" . ,(hx :eval (setq isearch-string (hx-region-string)))))
     (,(kbd "M-/") . ("search lines" . occur))))
-;; Problem: all windows share the same cursor shape
-;; (add-hook
-;;  'modaled-normal-state-mode-hook
-;;  (lambda ()
-;;    ;; Set cursor shape for VT520 terminal
-;;    ;; see cursor style at https://invisible-island.net/xterm/ctlseqs/ctlseqs.html for more code
-;;    (unless (display-graphic-p)
-;;      (send-string-to-terminal "\e[2 q"))))
-
 
 (add-hook
  'modaled-select-state-mode-hook
@@ -642,7 +697,7 @@ Should be called only before entering multiple-cursors-mode."
   :states '("select")
   :bind
   ;; state changes
-  `(("s" . ("exit SELECT state" . modaled-set-main-state))))
+  `(("v" . ("exit SELECT state" . modaled-set-main-state))))
 
 ;; Common keybindings for normal and select states
 ;; Note:
@@ -675,12 +730,14 @@ Should be called only before entering multiple-cursors-mode."
     ("gd" . ("go to def" . ,(hx :let (xref-prompt-for-identifier nil) :eval xref-find-definitions)))
     ;; match mode
     ("mm" . ("match char" . ,(hx :re-sel :eval hx-match-char)))
+    ("mt" . ("match tag" . ,(hx :re-sel :eval hx-match-tag)))
     ("mj" . ("beginning of current pair" . ,(hx :re-sel :eval sp-beginning-of-sexp)))
     ("m;" . ("end of current pair" . ,(hx  :re-sel :eval sp-end-of-sexp)))
     ("msa" . ("select around current pair" . ,(hx :re-hl :eval (hx-match-select :around))))
     ("msi" . ("select inside current pair" . ,(hx :re-hl :eval (hx-match-select :inside))))
     ("ma" . ("surround with pair" . ,(hx :arg "c" :re-hl :eval modaled-set-main-state (hx-match-surround-add (car args)))))
-    ("mr" . ("replace surrounding pair" . ,(hx :arg "c" :re-hl :eval modaled-set-main-state (hx-match-surround-replace (car args)))))
+    ("mrc" . ("replace surrounding char" . ,(hx :arg "c" :re-hl :eval modaled-set-main-state (hx-match-surround-replace (car args)))))
+    ("mrt" . ("rename jsx tag" . ,(hx :re-hl :eval modaled-set-main-state jtsx-rename-jsx-element)))
     ;; C-i is the same as TAB for kbd and in terminal
     (,(kbd "C-i") . ("jump forward" . xref-go-forward))
     (,(kbd "C-o") . ("jump backward" . xref-go-back))
@@ -721,7 +778,7 @@ Should be called only before entering multiple-cursors-mode."
     (" ?" . ("search symbol" . apropos))
     (" k" . ("show eldoc" . hx-show-eldoc))
     ;; view mode
-    ("v" . ("toggle visibility" . hx-toggle-visibility))
+    (" v" . ("toggle visibility" . hx-toggle-visibility))
     ;; multiple cursors
     (" c" . ("toggle multiple-cursors-mode" . hx-toggle-multiple-cursors))
     ("c" . ("add cursor and move next line" . ,(hx :eval hx-add-cursor next-line)))
@@ -747,17 +804,21 @@ Should be called only before entering multiple-cursors-mode."
     ;; git
     (" go" . ("open magit" . magit-status))
     (" gd" . ("show diff" . vc-diff))
-    ;; unimpaired (structure moving)
-    ("[[" . ("previous" . hx-previous))
-    ("]]" . ("next" . hx-next))
-    ("[s" . ("previous sibling" . hx-previous-sibling))
-    ("]s" . ("next sibling" . hx-next-sibling))
-    ("[l" . ("out of list (TS)" . combobulate-navigate-up-list-maybe))
-    ("]l" . ("into list (TS)" . combobulate-navigate-down-list-maybe))
-    ("[ms" . ("move sibling up (TS)" . combobulate-drag-up))
-    ("]ms" . ("move sibling down (TS)" . combobulate-drag-down))
-    ("[d" . ("prev diagnostic" . ,(hx :eval (flymake-goto-prev-error nil '(:error :warning) t))))
-    ("]d" . ("next diagnostic" . ,(hx :eval (flymake-goto-next-error nil '(:error :warning) t))))
+    ;; structural moving/editing
+    ("sj" . ("prev" . hx-struct-prev))
+    ("s;" . ("next" . hx-struct-next))
+    ("ssj" . ("backward" . hx-struct-backward))
+    ("ss;" . ("forward" . hx-struct-forward))
+    ("sl" . ("up in hierarchy (TS)" . hx-struct-up))
+    ("sk" . ("down into hierarchy (TS)" . hx-struct-down))
+    ("sdj" . ("drag backward in sibling (TS)" . hx-struct-drag-backward))
+    ("sd;" . ("drag forward in sibling (TS)" . hx-struct-drag-forward))
+    ("sdl" . ("drag up in hierarchy (TS)" . hx-struct-drag-up))
+    ("sdk" . ("drag down in hierarchy (TS)" . hx-struct-drag-down))
+    ("sW" . ("wrap struct (TS)" . hx-struct-wrap))
+    ("sD" . ("delete struct (TS)" . hx-struct-delete))
+    ("sej" . ("prev error" . ,(hx :eval (flymake-goto-prev-error nil '(:error :warning) t))))
+    ("se;" . ("next error" . ,(hx :eval (flymake-goto-next-error nil '(:error :warning) t))))
     ;; misc
     ("!" . ("run shell command" . shell-command))
     ("|" . ("eval expr" . eval-expression))

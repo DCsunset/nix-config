@@ -12,13 +12,8 @@
   (default-text-scale-mode 1)
   :config
   (setq default-text-scale-amount 12))
-;; Set default font size
-(set-frame-font "Monospace 12" nil t)
-
-(use-package markdown-mode
-  :mode ("README\\.md\\'" . gfm-mode)
-  :init
-  (setq markdown-command '("pandoc" "--from=markdown" "--to=html5")))
+;; Set default font size for GUI
+(set-frame-font "Monospace 14" nil t)
 
 (use-package minions
   :commands minions-minor-modes-menu)
@@ -29,13 +24,12 @@
 
 (use-package rainbow-mode
   :commands rainbow-mode
-  :demand t)
+  :hook (after-init  . global-rainbow-mode))
 ;; enable it by default
 (define-globalized-minor-mode global-rainbow-mode
   rainbow-mode
   (lambda () (rainbow-mode 1))
   :group 'rainbow)
-(global-rainbow-mode 1)
 
 (use-package hl-todo
   :commands global-hl-todo-mode
@@ -61,42 +55,6 @@
   ;; show info about the packages loaded and the init time
   (setq dashboard-set-init-info t)
   (dashboard-setup-startup-hook))
-
-(use-package smartparens
-  :demand t
-  :hook
-  ((html-mode tsx-ts-mode) . (lambda () (require 'smartparens-html)))
-  (rust-ts-mode . (lambda () (require 'smartparens-rust)))
-  (python-ts-mode . (lambda () (require 'smartparens-python)))
-  (go-ts-mode . (lambda () (require 'smartparens-go)))
-  ((c-ts-mode c++-ts-mode) . (lambda () (require 'smartparens-c)))
-  ((js-ts-mode typescript-ts-mode) . (lambda () (require 'smartparens-javascript)))
-  (latex-mode . (lambda () (require 'smartparens-latex)))
-  (org-mode . (lambda () (require 'smartparens-org)))
-  :commands (smartparens-global-mode
-             sp-get-enclosing-sexp
-             sp-beginning-of-sexp
-             sp-end-of-sexp)
-  :config
-  (smartparens-global-mode))
-
-(use-package caddyfile-mode
-  :mode (("Caddyfile\\'" . caddyfile-mode))
-  :hook
-  (caddyfile-mode . (lambda ()
-                      ; overwrite indent settings in caddyfile-mode
-                      (setq-local tab-width 2
-                                  indent-tabs-mode nil))))
-
-(use-package combobulate
-  :commands (combobulate-navigate-previous
-             combobulate-navigate-next
-             combobulate-navigate-logical-previous
-             combobulate-navigate-logical-next
-             combobulate-drag-up
-             combobulate-drag-down
-             combobulate-navigate-up-list-maybe
-             combobulate-navigate-down-list-maybe))
 
 ;; xclip (to support clipboard in terminal
 (use-package xclip
@@ -285,42 +243,14 @@
               ("<return>" . nil)
               ("C-w" . nil)
               ("<escape>" . (lambda () (interactive) (company-abort) (modaled-set-main-state))))
-  :init
+  :custom
   ;; complete on 2 chars instead of 3
-  (setq-default company-minimum-prefix-length 2
-                ;; prevent completing with wrong cases
-                company-dabbrev-downcase nil
-                company-dabbrev-ignore-case nil))
-
-;;; eglot LSP client
-(use-package eglot
-  :commands (eglot-rename
-             eglot-format
-             eglot-format-buffer
-             eglot-code-actions
-             eglot-code-action-quickfix)
-  :hook
-  ((haskell-mode
-    c-ts-mode
-    c++-ts-mode
-    rust-ts-mode
-    go-ts-mode
-    python-ts-mode
-    html-mode
-    js-ts-mode
-    typescript-ts-mode
-    tsx-ts-mode
-    bash-ts-mode
-    css-ts-mode
-    json-ts-mode
-    toml-ts-mode
-    yaml-ts-mode
-    dockerfile-ts-mode
-    nix-mode
-    latex-mode) . eglot-ensure)
-  :init
-  ; disable event buffer (hangs frequently in js/ts)
-  (setq eglot-events-buffer-size 0))
+  (company-minimum-prefix-length 2)
+  ;; prevent completing with wrong cases
+  (company-dabbrev-downcase nil)
+  (company-dabbrev-ignore-case nil)
+  ;; cycle candidates' selection
+  (company-selection-wrap-around t))
 
 ;; Manage popup window
 (use-package popwin
@@ -365,8 +295,8 @@
 (modaled-define-keys
   :substates '("magit-status")
   :bind
-  `(("s" . ("stage" . magit-stage))
-    ("S" . ("stage all" . magit-stage-modified))
+  `(("a" . ("stage" . magit-stage))
+    ("A" . ("stage all" . magit-stage-modified))
     ("u" . ("unstage" . magit-unstage))
     ("U" . ("unstage all" . magit-unstage-all))
     ("P" . ("push changes" . magit-push))
@@ -433,48 +363,3 @@
                  ;;(dedicated . t) ;dedicated is supported in emacs27
                  (reusable-frames . visible)
                  (window-height . 0.3))))
-
-;; beancount
-(use-package beancount
-  :mode ("\\.beancount\\'" . beancount-mode))
-
-
-;;; tree-sitter (put at the end as some packages above may change auto-mode-alist)
-
-;; remap major mode to ts major mode
-(defvar ts-mode-remap-alist
-  '((c-mode . c-ts-mode)
-    (c++-mode . c++-ts-mode)
-    (c-or-c++-mode . c-or-c++-ts-mode)
-    (javascript-mode . js-ts-mode)
-    (js-mode . js-ts-mode)
-    (python-mode . python-ts-mode)
-    (css-mode . css-ts-mode)
-    (js-json-mode . json-ts-mode)
-    (conf-toml-mode . toml-ts-mode)
-    (sh-mode . bash-ts-mode)))
-
-(defun remap-ts-mode (elem)
-  "Remap mode in ELEM to ts mode."
-  (let* ((orig (cdr elem))
-         (new (cdr (assoc orig ts-mode-remap-alist))))
-    (cons (car elem)
-          (or new orig))))
-
-;; replace modes in all mode alists
-;; `major-mode-remap-alist' only affects `auto-mode-alist' so not using it.
-(setq-default interpreter-mode-alist
-              (mapcar #'remap-ts-mode interpreter-mode-alist))
-(setq-default auto-mode-alist
-              (mapcar #'remap-ts-mode auto-mode-alist))
-
-(add-to-list 'auto-mode-alist '("Dockerfile" . dockerfile-ts-mode))
-(add-to-list 'auto-mode-alist '("Containerfile" . dockerfile-ts-mode))
-(add-to-list 'auto-mode-alist '("\\.rs\\'" . rust-ts-mode))
-(add-to-list 'auto-mode-alist '("\\.go\\'" . go-ts-mode))
-(add-to-list 'auto-mode-alist '("\\`go.mod\\'" . go-mode-ts-mode))
-(add-to-list 'auto-mode-alist '("\\.[cm]?js\\'" . js-ts-mode))
-(add-to-list 'auto-mode-alist '("\\.z?sh\\'" . bash-ts-mode))
-(add-to-list 'auto-mode-alist '("\\.ts\\'" . typescript-ts-mode))
-(add-to-list 'auto-mode-alist '("\\.[jt]sx\\'" . tsx-ts-mode))
-(add-to-list 'auto-mode-alist '("\\.ya?ml\\'" . yaml-ts-mode))

@@ -15,25 +15,6 @@
               echo-keystrokes 0.01)  ; show presses keys immediately
 (global-display-line-numbers-mode)
 
-;;; editor config
-;; (for many variables, only `setq-default' works in default.el)
-(setq-default major-mode 'org-mode  ; use org-mode by default instead of fundamental-mode
-              indent-tabs-mode nil  ; use spaces for indentation
-              standard-indent 2
-              tab-width 2
-              sh-indentation 2
-              nushell-indent-offset 2
-              python-indent-offset 2
-              css-indent-offset 2
-              js-indent-level 2
-              go-ts-mode-indent-offset 2
-              rust-ts-mode-indent-offset 2
-              ess-fancy-comments nil  ; indent comment line as normal code
-              select-enable-clipboard nil  ; don't paste to clipboard by default
-              interprogram-paste-function nil  ; don't copy clipboard to kill-ring
-              interprogram-cut-function nil  ; don't copy kill-ring to clipboard
-              show-trailing-whitespace t)
-
 ;; Make jump history local to each window
 (setq-default xref-history-storage 'xref-window-local-history)
 

@@ -72,7 +72,7 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
     (list
      ;; read-only
      (if buffer-read-only
-         (concat (nerd-icons-faicon "nf-fa-lock") " ")
+         (concat " " (nerd-icons-faicon "nf-fa-lock"))
        "")
      ;; name
      (propertize (surround-spaces name)

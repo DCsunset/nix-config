@@ -6,6 +6,7 @@
     package = with pkgs; emacs29;
     # emacs packages
     extraPackages = epkgs: with epkgs; [
+      jtsx
       pkgs.nur-dcsunset.emacsPackages.modaled
       pkgs.nur-dcsunset.emacsPackages.combobulate
       pkgs.nur-dcsunset.emacsPackages.org-moderncv
@@ -77,7 +78,16 @@
         tree-sitter-elisp
       ]))
     ];
-    extraConfig = mylib.readFiles [ ./common.el ./hx.el ./modeline.el ./tempo.el ./check.el ./org.el ./default.el ];
+    extraConfig = mylib.readFiles [
+      ./common.el
+      ./hx.el
+      ./modeline.el
+      ./language.el
+      ./tempo.el
+      ./check.el
+      ./org.el
+      ./default.el
+    ];
   };
 
   # some config only take effects in user config instead of default.el
