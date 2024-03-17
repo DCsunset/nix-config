@@ -14,6 +14,7 @@
               help-window-select t  ; always select help window to close it easily
               echo-keystrokes 0.01)  ; show presses keys immediately
 (global-display-line-numbers-mode)
+(setq ring-bell-function #'ignore)  ; disable bell
 
 ;; Make jump history local to each window
 (setq-default xref-history-storage 'xref-window-local-history)

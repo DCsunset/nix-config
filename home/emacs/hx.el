@@ -134,11 +134,12 @@ Toggle it when ARG is nil or 0."
 
 (defun hx-region-replace (char)
   "Replace region with given CHAR."
-  (let ((size (hx-region-size))
-        (pos (point)))
-    (hx-region-apply #'delete-region)
-    (insert (make-string size char))
-    (goto-char pos)))  ; save-excursion won't work as text is changed
+  (unless (eq char ?\e)  ; cancel replace when char is ESC
+    (let ((size (hx-region-size))
+          (pos (point)))
+      (hx-region-apply #'delete-region)
+      (insert (make-string size char))
+      (goto-char pos))))  ; save-excursion won't work as text is changed
 
 (defun hx-paste (text direction)
   "Paste TEXT around region (before if DIRECTION is negative and after otherwise)."
@@ -187,14 +188,18 @@ Toggle it when ARG is nil or 0."
 
 ARGS is a list separated by options (name starts with :).
 The following options are available:
-:arg ARG     Argument descriptor for the interactive lambda function.
-             Argument will be (&rest args).
-:let ARGS    Bind variables in `let' macro using pairs.
-:region      Set native region to `hx-region' for body forms.
-:re-hl       Re-highlight selection.
-:re-sel      Update selection based on modaled state.
-             Re-highlight if in SELECT state or clear selection otherwise.
-:eval FORMS  Forms to evaluate in body."
+:arg-desc DESC Argument descriptor for the interactive lambda function.
+               Argument will be (&rest l-args).
+:arg DEF       Read argument for eval forms. Argument will be arg.
+               The following definitions supported:
+               - (c ARGS): Call `read-char' with args
+               - (s ARGS): Call `read-from-minibuffer' with args
+:let ARGS      Bind variables in `let' macro using pairs.
+:region        Set native region to `hx-region' for body forms.
+:re-hl         Re-highlight selection.
+:re-sel        Update selection based on modaled state.
+               Re-highlight if in SELECT state or clear selection otherwise.
+:eval FORMS    Forms to evaluate in body."
   (let* ((opts
           ;; normalize options by partitioning args by : items
           (let ((parts (-partition-before-pred
@@ -208,8 +213,9 @@ The following options are available:
                           (plist-put acc (car p) (cdr p)))
                         parts
                         '())))
-         (arg-desc (car (plist-get opts :arg)))
-         (lambda-args (if arg-desc '(&rest args) '()))
+         (arg-desc (car (plist-get opts :arg-desc)))
+         (lambda-args (if arg-desc '(&rest l-args) '()))
+         (arg-def (car (plist-get opts :arg)))
          (let-bindings (or (plist-get opts :let) '()))
          (eval-forms (mapcar (lambda (f)
                                (if (listp f)
@@ -241,16 +247,23 @@ The following options are available:
                                 ,f)))))
     `(lambda ,lambda-args
        (interactive ,arg-desc)
-       (let ,let-bindings
-         ,(funcall
-           (-compose region-wrapper
-                     re-hl-wrapper
-                     re-sel-wrapper)
-           ;; need to catch error to let wrappers finish completely
-           `(condition-case err
-                (progn ,@eval-forms)
-              (error
-               (message "%s" (error-message-string err)))))))))
+       (let ((arg ,(when arg-def
+                     `(apply #',(pcase (car arg-def)
+                                  ('c #'read-char)
+                                  ('s #'read-from-minibuffer)
+                                  (_ (error
+                                      (message "Invalid hx arg def: %s" arg-def))))
+                             ',(cdr arg-def)))))
+         (let ,let-bindings
+           ,(funcall
+             (-compose region-wrapper
+                       re-hl-wrapper
+                       re-sel-wrapper)
+             ;; need to catch error to let wrappers finish completely
+             `(condition-case err
+                  (progn ,@eval-forms)
+                (error
+                 (message "%s" (error-message-string err))))))))))
 
 (defun hx-find-char (char direction offset &optional marking)
   "Find CHAR in DIRECTION and place the cursor with OFFSET from it.
@@ -712,14 +725,14 @@ Should be called only before entering multiple-cursors-mode."
     ("k" . ("down" . ,(hx :re-sel :eval next-line)))
     ("w" . ("next word" . ,(hx :re-hl :eval (hx-next-word (equal modaled-state "normal")))))
     ("b" . ("prev word" . ,(hx :re-hl :eval (hx-previous-word (equal modaled-state "normal")))))
-    ("f" . ("find next char" . ,(hx :arg "c" :re-hl :eval (hx-find-char (car args) +1 -1 (equal modaled-state "normal")))))
-    ("t" . ("find till next char" . ,(hx :arg "c" :re-hl :eval (hx-find-char (car args) +1 -2 (equal modaled-state "normal")))))
-    ("F" . ("find prev char" . ,(hx :arg "c" :re-hl :eval (hx-find-char (car args) -1 0 (equal modaled-state "normal")))))
-    ("T" . ("find till prev char" . ,(hx :arg "c" :re-hl :eval (hx-find-char (car args) -1 1 (equal modaled-state "normal")))))
+    ("f" . ("find next char" . ,(hx :arg (c "Find: ") :re-hl :eval (hx-find-char arg +1 -1 (equal modaled-state "normal")))))
+    ("t" . ("find till next char" . ,(hx :arg (c "Till: ") :re-hl :eval (hx-find-char arg +1 -2 (equal modaled-state "normal")))))
+    ("F" . ("find prev char" . ,(hx :arg (c "Find prev: ") :re-hl :eval (hx-find-char arg -1 0 (equal modaled-state "normal")))))
+    ("T" . ("find till prev char" . ,(hx :arg (c "Till prev") :re-hl :eval (hx-find-char (car args) -1 1 (equal modaled-state "normal")))))
     (,(kbd "C-u") . ("scroll up" . ,(hx :re-sel :eval (funcall-interactively #'previous-line 10))))
     (,(kbd "C-d") . ("scroll down" . ,(hx :re-sel :eval (funcall-interactively #'next-line 10))))
     ;; goto mode
-    ("gg" . ("go to line" . ,(hx :arg "p" :re-sel :eval (forward-line (- (car args) (line-number-at-pos))))))
+    ("gg" . ("go to line" . ,(hx :arg-desc "p" :re-sel :eval (forward-line (- (car l-args) (line-number-at-pos))))))
     ("ge" . ("end of file" . ,(hx :re-sel :eval (goto-char (point-max)))))
     ("gj" . ("start of line" . ,(hx :re-sel :eval beginning-of-line)))
     ("g;" . ("end of line" . ,(hx :re-sel :eval end-of-line (re-search-backward ".\\|^"))))  ; move to last char if exists
@@ -735,8 +748,8 @@ Should be called only before entering multiple-cursors-mode."
     ("m;" . ("end of current pair" . ,(hx  :re-sel :eval sp-end-of-sexp)))
     ("msa" . ("select around current pair" . ,(hx :re-hl :eval (hx-match-select :around))))
     ("msi" . ("select inside current pair" . ,(hx :re-hl :eval (hx-match-select :inside))))
-    ("ma" . ("surround with pair" . ,(hx :arg "c" :re-hl :eval modaled-set-main-state (hx-match-surround-add (car args)))))
-    ("mrc" . ("replace surrounding char" . ,(hx :arg "c" :re-hl :eval modaled-set-main-state (hx-match-surround-replace (car args)))))
+    ("ma" . ("surround with pair" . ,(hx :arg (c "Surround: ") :re-hl :eval modaled-set-main-state (hx-match-surround-add arg))))
+    ("mrc" . ("replace surrounding char" . ,(hx :arg (c "Surround replace: ") :re-hl :eval modaled-set-main-state (hx-match-surround-replace arg))))
     ("mrt" . ("rename jsx tag" . ,(hx :re-hl :eval modaled-set-main-state jtsx-rename-jsx-element)))
     ;; C-i is the same as TAB for kbd and in terminal
     (,(kbd "C-i") . ("jump forward" . xref-go-forward))
@@ -748,10 +761,10 @@ Should be called only before entering multiple-cursors-mode."
     ("A" . ("insert at end of line" . ,(hx :eval hx-no-sel (modaled-set-state "insert") end-of-line)))
     ("o" . ("insert below" . ,(hx :eval hx-no-sel (modaled-set-state "insert") end-of-line newline-and-indent)))
     ("O" . ("insert above" . ,(hx :eval hx-no-sel (modaled-set-state "insert") beginning-of-line newline-and-indent (forward-line -1) indent-according-to-mode)))
-    ("r" . ("replace" . ,(hx :arg "c" :eval hx-no-sel modaled-set-main-state (hx-region-replace (car args)))))
+    ("r" . ("replace" . ,(hx :arg (c "Replace: ") :eval modaled-set-main-state (hx-region-replace arg) hx-no-sel)))
     ("y" . ("copy" . ,(hx :eval modaled-set-main-state (hx-region-apply #'kill-ring-save))))
     ("d" . ("delete" . ,(hx :eval modaled-set-main-state (hx-region-apply #'delete-region) hx-no-sel)))
-    ("e" . ("edit" . ,(hx :eval (modaled-set-state "insert") (hx-region-apply #'delete-region) hx-no-sel)))
+    ("c" . ("change" . ,(hx :eval (modaled-set-state "insert") (hx-region-apply #'delete-region) hx-no-sel)))
     ("P" . ("paste before" . ,(hx :eval (hx-paste (current-kill 0 t) -1) hx-no-sel)))
     ("p" . ("paste after" . ,(hx :eval (hx-paste (current-kill 0 t) +1) hx-no-sel)))
     (,(kbd "M-P") . ("paste before from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") -1) hx-no-sel)))
@@ -777,14 +790,12 @@ Should be called only before entering multiple-cursors-mode."
     (" d" . ("directory tree" . treemacs))
     (" ?" . ("search symbol" . apropos))
     (" k" . ("show eldoc" . hx-show-eldoc))
-    ;; view mode
-    (" v" . ("toggle visibility" . hx-toggle-visibility))
     ;; multiple cursors
     (" c" . ("toggle multiple-cursors-mode" . hx-toggle-multiple-cursors))
-    ("c" . ("add cursor and move next line" . ,(hx :eval hx-add-cursor next-line)))
-    ("C" . ("add cursor and move prev line" . ,(hx :eval hx-add-cursor previous-line)))
+    (" C" . ("remove all cursors" . hx-remove-cursors))
+    ("C" . ("add cursor and move next line" . ,(hx :eval hx-add-cursor next-line)))
+    (,(kbd "M-C") . ("Add cursor and move prev line" . ,(hx :eval hx-add-cursor previous-line)))
     (,(kbd "M-c") . ("toggle a cursor at point" . hx-toggle-cursor))
-    (,(kbd "M-C") . ("remove all cursors" . hx-remove-cursors))
     ;; gtd
     (" tl" . ("gtd list" . org-todo-list))
     (" ti" . ("gtd inbox" . ,(hx :eval (find-file (gtd-file "inbox.org")))))
@@ -880,7 +891,7 @@ Should be called only before entering multiple-cursors-mode."
   :states '("major" "normal" "select" "insert")
   :bind
   `(([escape] . ("main state" . ,(hx :eval modaled-set-main-state hx-format-blank-line hx-no-sel)))
-    (,(kbd "M-`") . ("toggle vterm" . vterm-toggle))
+    (,(kbd "M-t") . ("toggle vterm" . vterm-toggle))
     (,(kbd "M-h") . ("split horizontally" . ,(hx :eval split-window-horizontally other-window)))
     (,(kbd "M-v") . ("split vertically" . ,(hx :eval split-window-vertically other-window)))
     (,(kbd "M-q") . ("delete window" . delete-window))
@@ -888,6 +899,7 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-;") . ("right window" . windmove-right))
     (,(kbd "M-l") . ("up window" . windmove-up))
     (,(kbd "M-k") . ("down window" . windmove-down))
+    (,(kbd "C-v") . ("toggle visibility" . hx-toggle-visibility))
     (,(kbd "C-s") . ("save" . hx-save))
     (,(kbd "C-a") . ("abort" . hx-abort))
     (,(kbd "C-q") . ("quit" . save-buffers-kill-terminal))))

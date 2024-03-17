@@ -304,7 +304,7 @@
     ("d" . ("diff" . magit-diff))
     ("D" . ("discard" . magit-discard))
     ("r" . ("refresh" . magit-refresh))
-    ("R" . ("refresh all" . magit-refresh-all))
+    ("R" . ("rebase" . magit-rebase))
     ("c" . ("commit" . magit-commit))))
 (modaled-enable-substate-on-state-change
   "magit-status"

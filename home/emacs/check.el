@@ -16,7 +16,10 @@
 
 (define-globalized-minor-mode global-flymake-mode flymake-mode
   (lambda ()
-    (unless (minibufferp)
+    (unless (derived-mode-p
+             'minibuffer-mode
+             'vterm-mode
+             'special-mode)
       (flymake-cspell-setup)
       (flymake-mode-on))))
 

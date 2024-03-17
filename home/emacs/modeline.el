@@ -1,5 +1,8 @@
 ;; mode line
 
+(use-package shrink-path
+  :commands shrink-path-file)
+
 (defmacro my-modeline-def-construct (symbol form)
   "Define my modeline segment with SYMBOL and FORM."
   (declare (indent defun))
@@ -7,7 +10,7 @@
      (defvar-local ,symbol '(:eval ,form))
      ;; FIXME: debug
      (setq ,symbol '(:eval ,form))
-     ;; need this property for :eval in modeline
+     ;; need this propertize to work modeline
      (put ',symbol 'risky-local-variable t)))
 
 (defun my-modeline-def-map (cmd1 cmd3)
@@ -67,8 +70,9 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
 
 ;;; buffer
 (my-modeline-def-construct my-modeline-buffer
-  ;; TODO: truncate path for file if necessary
-  (let ((name (buffer-name)))
+  (let ((name (if (not buffer-file-name)
+                  (buffer-name)
+                (shrink-path-file buffer-file-name t))))
     (list
      ;; read-only
      (if buffer-read-only
@@ -76,9 +80,30 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
        "")
      ;; name
      (propertize (surround-spaces name)
-                 'face (when (buffer-modified-p)
+                 'face (when (and buffer-file-name
+                                  (buffer-modified-p))
                          '((t :slant italic :weight bold)))
                  'help-echo buffer-file-name))))
+
+;;; eglot
+(defvar-local my-modeline-eglot nil)
+(put 'my-modeline-eglot 'risky-local-variable t)
+(defun my-modeline--update-eglot ()
+  "Update eglot construct."
+  (let* ((server (and (eglot-managed-p) (eglot-current-server)))
+         (name (and server (plist-get (eglot--server-info server) :name)))
+         (last-error (and server (jsonrpc-last-error server)))
+         (face (cond (last-error 'error)
+                     (server 'success)
+                     (t 'shadow)))
+         (help-echo (cond (last-error (format "Eglot error: %s" last-error))
+                          (name (format "Eglot connected: %s" name))
+                          (t "Eglot disconnected"))))
+    (setq my-modeline-eglot
+          (propertize (surround-spaces (nerd-icons-octicon "nf-oct-rocket"))
+                      'face face
+                      'help-echo help-echo))))
+(add-hook 'eglot-managed-mode-hook #'my-modeline--update-eglot)
 
 ;;; flymake
 (defun my-modeline--flymake-count (type)
@@ -173,6 +198,7 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
                 "        "  ; FIXME: remove this after Emacs 30
                 mode-line-format-right-align  ; emacs 30
 
+                my-modeline-eglot
                 my-modeline-flymake
                 my-modeline-encoding
                 my-modeline-git
