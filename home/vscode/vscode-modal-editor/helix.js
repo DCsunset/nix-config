@@ -39,8 +39,7 @@ module.exports = {
 		/* Multi-cursor
 		 * (for insert cursor above, use keybindings.json for Alt-Shift-C)
 		 */
-		c: repeatable("editor.action.insertCursorBelow"),
-		",": "removeSecondaryCursors",
+		C: repeatable("editor.action.insertCursorBelow"),
 
 		J: repeatable("editor.action.joinLines"),
 		x: repeatable([
@@ -130,12 +129,12 @@ module.exports = {
 			// only when there is a prefix count
 			when: "_ctx.count !== undefined"
 		},
-		
+
 		// match mode
 		m: {
 			m: "editor.action.jumpToBracket"
 		},
-		
+
 		// goto mode
 		g: {
 			g: {
@@ -157,7 +156,7 @@ module.exports = {
 			n: "workbench.action.nextEditor",
 			d: "editor.action.revealDefinition"
 		},
-		
+
 		// space mode
 		" ": {
 			// yank to clipboard
@@ -187,9 +186,10 @@ module.exports = {
 			f: "workbench.action.quickOpen",
 			b: "workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup",
 			k: "editor.action.showHover",
-			"?": "workbench.action.showCommands"
+			"?": "workbench.action.showCommands",
+      C: "removeSecondaryCursors"
 		},
-		
+
 		// search
 		"/": "actions.find",
 		n: [
@@ -218,7 +218,7 @@ module.exports = {
 				when: "!_ctx.selection.isEmpty"
 			}
 		],
-		
+
 		// Unimpaired
 		"[": {
 			d: "editor.action.marker.prev",
@@ -309,7 +309,7 @@ module.exports = {
 		},
 
 		// set to select mode
-		s: "modalEditor.setSelectMode"
+		v: "modalEditor.setSelectMode"
 	},
 
 	select: {
@@ -373,7 +373,7 @@ module.exports = {
 				}`
 			})
 		},
-		
+
 		// goto mode
 		g: {
 			j: "cursorLineStartSelect",

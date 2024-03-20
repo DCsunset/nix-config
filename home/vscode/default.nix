@@ -73,6 +73,10 @@ with lib; {
 
     keybindings = [
       {
+        key = "shift+alt+c";
+        command = "editor.action.insertCursorAbove";
+      }
+      {
         key = "alt+[";
         command = "workbench.action.togglePanel";
       }
