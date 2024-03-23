@@ -6,6 +6,7 @@
     package = with pkgs; emacs29;
     # emacs packages
     extraPackages = epkgs: with epkgs; [
+      surround
       jtsx
       pkgs.nur-dcsunset.emacsPackages.modaled
       pkgs.nur-dcsunset.emacsPackages.combobulate
@@ -21,7 +22,6 @@
       beancount
       rainbow-mode
       dashboard
-      smartparens
       xclip
       modus-themes
       centaur-tabs

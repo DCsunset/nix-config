@@ -10,6 +10,7 @@
 (scroll-bar-mode -1)
 (blink-cursor-mode -1)
 (column-number-mode 1)
+(electric-pair-mode 1)  ; auto complete pair
 (setq-default visible-cursor nil ; for non-blinking cursor in console
               help-window-select t  ; always select help window to close it easily
               echo-keystrokes 0.01)  ; show presses keys immediately

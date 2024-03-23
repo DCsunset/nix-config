@@ -81,22 +81,6 @@
   ; disable event buffer (hangs frequently in js/ts)
   (setq eglot-events-buffer-size 0))
 
-(use-package smartparens
-  :commands (smartparens-global-mode
-             sp-get-enclosing-sexp
-             sp-beginning-of-sexp
-             sp-end-of-sexp)
-  :hook
-  ((html-mode tsx-ts-mode) . (lambda () (require 'smartparens-html)))
-  (rust-ts-mode . (lambda () (require 'smartparens-rust)))
-  (python-ts-mode . (lambda () (require 'smartparens-python)))
-  (go-ts-mode . (lambda () (require 'smartparens-go)))
-  ((c-ts-mode c++-ts-mode) . (lambda () (require 'smartparens-c)))
-  ((js-ts-mode typescript-ts-mode) . (lambda () (require 'smartparens-javascript)))
-  (latex-mode . (lambda () (require 'smartparens-latex)))
-  (org-mode . (lambda () (require 'smartparens-org)))
-  (after-init . smartparens-global-mode))
-
 
 ;; tree-sitter (put at the end as some packages above may change auto-mode-alist)
 ;; remap major mode to ts major mode

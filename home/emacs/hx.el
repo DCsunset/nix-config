@@ -3,11 +3,41 @@
 (use-package highlight
   :commands (hlt-unhighlight-region hlt-highlight-region))
 
-; hx manages its own mark so that it can remove mark and cut region correctly
-; disable the transient mark mode
+(use-package surround
+  :commands (surround--get-pair-bounds
+             surround--make-pair)
+  :init
+  ;; global config
+  (setq surround-pairs
+        '(("("  . ")")
+          ("{"  . "}")
+          ("["  . "]")
+          ("<"  . ">")
+          ("'"  . "'")
+          ("`"  . "`")
+          ("\"" . "\"")))
+  ;; helper function
+  (defun update-pairs (remove-list add-list)
+    "Update surround-pairs in local var with REMOVE-LIST and ADD-LIST."
+    (setq-local
+     surround-pairs
+     (-concat add-list
+              (--remove (member (car it) remove-list)
+                        surround-pairs))))
+  :hook  ; set different pairs based on major mode
+  (emacs-lisp-mode . (lambda () (update-pairs '("'" "`") '(("`" . "'")))))
+  (rust-ts-mode . (lambda () (update-pairs '() '(("|" . "|")))))
+  (latex-mode . (lambda () (update-pairs '() '(("$" . "$")))))
+  (org-mode . (lambda () (update-pairs '() '(("~" . "~")
+                                             ("=" . "=")
+                                             ("/" . "/")
+                                             ("_" . "_"))))))
+
+;; hx manages its own mark so that it can remove mark and cut region correctly
+;; disable the transient mark mode
 (transient-mark-mode -1)
 
-; Reference: evil
+;; Reference: evil
 (defun hx--esc-filter (map)
   "Translate \\e to [escape] for MAP if no further event arrives in terminal.
 
@@ -72,6 +102,10 @@ Toggle it when ARG is nil or 0."
 (defun within-range (val range)
   "Test if VAL is within RANGE."
   (and (>= val (car range)) (< val (cdr range))))
+
+(defun sizeof-range (range)
+  "Get size of RANGE."
+  (- (cdr range) (car range)))
 
 (defun hx-region ()
   "Get the currently selected region (start . end)."
@@ -369,6 +403,21 @@ Set mark when MARKING is t."
     (forward-line 1)
     (hx-extend-to-line-bounds)))
 
+(defun hx-extend-char ()
+  "Extend selection by one char."
+  (interactive)
+  (let ((region (hx-region)))
+    (hx-set-mark (max 0 (1- (car region))))
+    (goto-char (min (point-max) (cdr region)))))
+
+(defun hx-shrink-char ()
+  "Extend selection by one char."
+  (interactive)
+  (let ((region (hx-region)))
+    (when (> (sizeof-range region) 1)
+      (hx-set-mark (1+ (car region)))
+      (goto-char (- (cdr region) 2)))))
+
 (defun hx-join-lines ()
   "Join lines in selecions.
 
@@ -385,46 +434,62 @@ If the selection is within one line, join the next line."
       (join-line nil beg end))))
 
 
-(defun hx-get-enclosing-pair (&optional level)
-  "Return the balanced expression that wraps point (inclusive).
+;; match mode
 
-With LEVEL, acend that many times.
-Default is 1 which means the nearest level."
-  ;; try two positions as the pointer has a width
-  (let ((left (sp-get-enclosing-sexp))
-        ;; inclusive
-        (right (save-excursion
-                 (forward-char 1)
-                 (sp-get-enclosing-sexp level))))
-    (if (and left right)
-        (let* ((lbeg (plist-get left :beg))
-               (lend (plist-get left :end))
-               (rbeg (plist-get right :beg))
-               (rend (plist-get right :end))
-               (pos (point))
-               ;; test if within range (there are bugs in sp)
-               ;; it also prevents going outside boundary (like consecutive closing parens)
-               (lwithin (within-range pos (cons lbeg lend)))
-               (rwithin (within-range pos (cons rbeg rend))))
-          (cond ((and lwithin rwithin)
-                 ; return inner pair
-                 (if (> lbeg rbeg) left right))
-                (lwithin left)
-                (rwithin right)))
-      (or left right))))
+(defun hx-get-surround-pair (&optional chars)
+  "Return surround pair that covers point (inclusive).
 
+With CHARS, only search for pairs involving them.
+By default, all chars in the pair are searched.
+Specific LEFT-IN or RIGHT-IN to make sure cursor is strictly inside,"
+  (let* ((pairs (if chars
+                    (mapcar #'surround--make-pair chars)
+                  surround-pairs))
+         (result (seq-reduce (lambda (final pair)
+                               (let* ((at-same-pair (and (equal (car pair) (cdr pair))
+                                                         (equal (car pair) (string (char-after (point))))))
+                                      ;; get-pair-bounds doesn't know whether it's at beg or end
+                                      ;; use sexp if not nil
+                                      (sexp-bounds (when (and (equal (car pair) (cdr pair))
+                                                              (equal (car pair) (string (char-after (point)))))
+                                                     (when-let ((bnds (bounds-of-thing-at-point 'sexp)))
+                                                       (if (= (car bnds) (point))
+                                                           ;; point at beg
+                                                           bnds
+                                                         ;; when point at end, move outside
+                                                         ;; otherwise, it might be bounds of things inside
+                                                         (save-excursion
+                                                           (forward-char 1)
+                                                           (bounds-of-thing-at-point 'sexp))))))
+                                      (bounds (or sexp-bounds
+                                                  (ignore-errors (surround--get-pair-bounds (car pair) 'outer)))))
+                                 (if (and bounds
+                                          (or (not final)
+                                              (< (sizeof-range bounds)
+                                                 (sizeof-range final))))
+                                     bounds
+                                   final)))
+                             pairs
+                             nil)))
+    (when result
+      (cons (car result) (1- (cdr result))))))
 
-(defun hx-match-char ()
-  "Go to matching (or surrounding) char at current point."
+(defun hx-match-char (&optional char direction)
+  "Go to matching surrounding char at current point.
+
+Optional left CHAR and DIRECTION (to move to outer) can be specified."
   (interactive)
-  (let ((pair (hx-get-enclosing-pair)))
-    (when pair
-      (let ((beg (plist-get pair :beg))
-            (end (1- (plist-get pair :end)))
-            (pos (point)))
-        (if (= pos end)
-            (goto-char beg)
-          (goto-char end))))))
+  (when-let* ((bounds (save-excursion
+                        (pcase direction
+                          ('left (forward-char -1))
+                          ('right (forward-char 1)))
+                        (hx-get-surround-pair (and char '(char)))))
+              (beg (car bounds))
+              (end (cdr bounds)))
+    (if (or (eq direction 'right)
+            (eq (point) beg))
+        (goto-char end)
+      (goto-char beg))))
 
 (defun hx-match-tag ()
   "Go to matching tag if in jtsx major mode."
@@ -433,41 +498,24 @@ Default is 1 which means the nearest level."
     ((guard (memq major-mode '(jtsx-jsx-mode jtsx-tsx-mode)))
      (jtsx-jump-jsx-element-tag-dwim))))
 
-(defun hx-match-select (arg)
-  "Selete current matching pair.
+(defun hx-match-select (ends &optional char)
+  "Select current matching pair with optional CHAR.
 
-ARG can be one of the following:
-:around  Select around the pair including itself
-:inside  Select only context inside the pair."
-  (let ((pair (hx-get-enclosing-pair)))
-    (when pair
-      ;; :beg is at the pair
-      ;; :end is outside the pair
-      (let ((beg (plist-get pair :beg))
-            (end (1- (plist-get pair :end))))
-        (cond ((eq arg :around)
-               (goto-char end)
-               (hx-set-mark beg))
-              ((eq arg :inside)
-               (goto-char (1- end))
-               ;; only select if there's content
-               (if (< (1+ beg) (1- end))
-                   (hx-set-mark (1+ beg))
-                 (hx-set-mark nil))))))))
+ENDS can be one of the following:
+'outer Select around the pair including itself
+'inner Select only context inside the pair."
+  (when-let* ((bounds (hx-get-surround-pair (and char '(char))))
+              (beg (car bounds))
+              (end (cdr bounds)))
+    (pcase ends
+      ('inner (goto-char (1- end))
+              (hx-set-mark (1+ beg)))
+      ('outer (goto-char end)
+              (hx-set-mark beg)))))
 
-(defconst
-  hx-matching-char-alist
-  '((?\( . ?\))
-    (?\[ . ?\])
-    (?< . ?>)
-    (?{ . ?}))
-  "Alist of matching chars.")
-
-(defun hx-match-surround-add (char)
-  "Surround current selection with matching CHAR pair."
-  (let ((pair (or (assq char hx-matching-char-alist)
-                  (rassq char hx-matching-char-alist)
-                  (cons char char)))
+(defun hx-match-add (char)
+  "Add matching CHAR pair around current selection."
+  (let ((pair (surround--make-pair char))
         (region (hx-region)))
     ; make sure the mark is set to select inserted chars afterwards
     (when (not hx--mark)
@@ -479,23 +527,20 @@ ARG can be one of the following:
     (insert (cdr pair))
     (backward-char 1)))
 
-(defun hx-match-surround-replace (char)
-  "Replace surrounding matching pair around current selection with CHAR pair.
+(defun hx-match-replace (char)
+  "Replace matching pair around current selection with CHAR pair.
 If no current selection (region is one char), run `hx-match-select' first."
-  (let* ((pair (or (assq char hx-matching-char-alist)
-                   (rassq char hx-matching-char-alist)
-                   (cons char char)))
+  (let* ((pair (surround--make-pair char))
          (region (let ((reg (hx-region)))
                    (if (> (cdr reg) (1+ (car reg)))
                        reg
                      ;; run match-select first
-                     (hx-match-select :around)
+                     (hx-match-select 'outer)
                      (hx-region))))
-         (left (char-after (car region)))
-         (right (char-before (cdr region))))
-    (if (or (eq left right)
-            (not (or (eq right (cdr (assq left hx-matching-char-alist)))
-                 (eq right left))))
+         (left (string (char-after (car region))))
+         (right (string (char-before (cdr region)))))
+    (if (not (or (equal right (cdr (assoc left surround-pairs)))
+                 (equal right left)))
         (message "Current region not surrounded by matching pair")
       (goto-char (car region))
       (delete-char 1)
@@ -505,14 +550,14 @@ If no current selection (region is one char), run `hx-match-select' first."
       (insert (cdr pair))
       (backward-char 1))))
 
-(defun hx-match-surround-delete ()
-  "Delete surrounding matching pair around current selection."
+(defun hx-match-delete ()
+  "Delete matching pair around current selection."
   (interactive)
   (let* ((region (hx-region))
          (left (char-after (car region)))
          (right (char-before (cdr region))))
-    (if (not (or (eq right (cdr (assq left hx-matching-char-alist)))
-                 (eq right left)))
+    (if (not (or (equal right (cdr (assoc left surround-pairs)))
+                 (equal right left)))
         (message "Current region not surrounded by matching pair")
       (goto-char (car region))
       (delete-char 1)
@@ -728,7 +773,7 @@ Should be called only before entering multiple-cursors-mode."
     ("f" . ("find next char" . ,(hx :arg (c "Find: ") :re-hl :eval (hx-find-char arg +1 -1 (equal modaled-state "normal")))))
     ("t" . ("find till next char" . ,(hx :arg (c "Till: ") :re-hl :eval (hx-find-char arg +1 -2 (equal modaled-state "normal")))))
     ("F" . ("find prev char" . ,(hx :arg (c "Find prev: ") :re-hl :eval (hx-find-char arg -1 0 (equal modaled-state "normal")))))
-    ("T" . ("find till prev char" . ,(hx :arg (c "Till prev") :re-hl :eval (hx-find-char (car args) -1 1 (equal modaled-state "normal")))))
+    ("T" . ("find till prev char" . ,(hx :arg (c "Till prev: ") :re-hl :eval (hx-find-char arg -1 1 (equal modaled-state "normal")))))
     (,(kbd "C-u") . ("scroll up" . ,(hx :re-sel :eval (funcall-interactively #'previous-line 10))))
     (,(kbd "C-d") . ("scroll down" . ,(hx :re-sel :eval (funcall-interactively #'next-line 10))))
     ;; goto mode
@@ -742,14 +787,15 @@ Should be called only before entering multiple-cursors-mode."
     ("gP" . ("prev buffer" . centaur-tabs-backward-group))
     ("gd" . ("go to def" . ,(hx :let (xref-prompt-for-identifier nil) :eval xref-find-definitions)))
     ;; match mode
-    ("mm" . ("match char" . ,(hx :re-sel :eval hx-match-char)))
+    ("mm" . ("match any char" . ,(hx :re-sel :eval hx-match-char)))
+    ("mc" . ("match char" . ,(hx :arg (c "Char: ") :re-sel :eval (hx-match-char arg))))
     ("mt" . ("match tag" . ,(hx :re-sel :eval hx-match-tag)))
-    ("mj" . ("beginning of current pair" . ,(hx :re-sel :eval sp-beginning-of-sexp)))
-    ("m;" . ("end of current pair" . ,(hx  :re-sel :eval sp-end-of-sexp)))
-    ("msa" . ("select around current pair" . ,(hx :re-hl :eval (hx-match-select :around))))
-    ("msi" . ("select inside current pair" . ,(hx :re-hl :eval (hx-match-select :inside))))
-    ("ma" . ("surround with pair" . ,(hx :arg (c "Surround: ") :re-hl :eval modaled-set-main-state (hx-match-surround-add arg))))
-    ("mrc" . ("replace surrounding char" . ,(hx :arg (c "Surround replace: ") :re-hl :eval modaled-set-main-state (hx-match-surround-replace arg))))
+    ("mj" . ("left outer pair" . ,(hx :re-sel :eval (hx-match-char nil 'left))))
+    ("m;" . ("right outer pair" . ,(hx :re-sel :eval (hx-match-char nil 'right))))
+    ("msm" . ("select any pair" . ,(hx :re-hl :eval (hx-match-select 'inner))))
+    ("msc" . ("select char pair" . ,(hx :arg (c "Char: ") :re-hl :eval (hx-match-select 'inner (string arg)))))
+    ("ma" . ("surround with pair" . ,(hx :arg (c "Surround: ") :re-hl :eval modaled-set-main-state (hx-match-add arg))))
+    ("mrc" . ("replace surrounding char" . ,(hx :arg (c "Surround replace: ") :re-hl :eval modaled-set-main-state (hx-match-replace arg))))
     ("mrt" . ("rename jsx tag" . ,(hx :re-hl :eval modaled-set-main-state jtsx-rename-jsx-element)))
     ;; C-i is the same as TAB for kbd and in terminal
     (,(kbd "C-i") . ("jump forward" . xref-go-forward))
@@ -780,6 +826,8 @@ Should be called only before entering multiple-cursors-mode."
     ;; selection
     ("x" . ("extend line below" . ,(hx :re-hl :eval hx-extend-line-below)))
     ("X" . ("extend line" . ,(hx :re-hl :eval hx-extend-to-line-bounds)))
+    ("e" . ("extend one char" . ,(hx :re-hl :eval hx-extend-char)))
+    ("E" . ("shrink one char" . ,(hx :re-hl :eval hx-shrink-char)))
     ;; space mode
     (" P" . ("clipboard paste before" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) -1) hx-no-sel)))
     (" p" . ("clipboard paste after" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) +1) hx-no-sel)))
@@ -815,6 +863,10 @@ Should be called only before entering multiple-cursors-mode."
     ;; git
     (" go" . ("open magit" . magit-status))
     (" gd" . ("show diff" . vc-diff))
+    ;; transformation mode (backtick)
+    ("`cu" . ("upper case" . ,(hx :eval (hx-region-apply #'upcase-region))))
+    ("`cl" . ("lower case" . ,(hx :eval (hx-region-apply #'downcase-region))))
+    ("`cc" . ("capitalized case" . ,(hx :eval (hx-region-apply #'capitalize-region))))
     ;; structural moving/editing
     ("sj" . ("prev" . hx-struct-prev))
     ("s;" . ("next" . hx-struct-next))
@@ -850,7 +902,7 @@ Should be called only before entering multiple-cursors-mode."
     ;; set tempo-match-finder temporarily to prevent conflicts
     (,(kbd "M-t") . ("tempo complete" . ,(hx :let (tempo-match-finder my-tempo-match-finder) :eval tempo-complete-tag)))
     ;; this makes pasting work in GUI
-    (,(kbd "C-V") . ("paste from clipboard" . ,(hx :eval (insert (xclip-get-selection 'clipboard)))))))
+    (,(kbd "C-S-v") . ("paste from clipboard" . ,(hx :eval (insert (xclip-get-selection 'clipboard)))))))
 ;; (add-hook
 ;;  'modaled-insert-state-mode-hook
 ;;  (lambda ()
