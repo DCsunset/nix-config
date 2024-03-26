@@ -95,7 +95,7 @@ module.exports = {
 		},
 
 		// Changes
-		e: recordChange([
+		c: recordChange([
 			"modalEditor.cut",
 			"modalEditor.setInsertMode"
 		]),
