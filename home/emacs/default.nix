@@ -6,6 +6,7 @@
     package = with pkgs; emacs29;
     # emacs packages
     extraPackages = epkgs: with epkgs; [
+      uuidgen
       surround
       jtsx
       pkgs.nur-dcsunset.emacsPackages.modaled

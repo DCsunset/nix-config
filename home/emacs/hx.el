@@ -943,7 +943,7 @@ Should be called only before entering multiple-cursors-mode."
   :states '("major" "normal" "select" "insert")
   :bind
   `(([escape] . ("main state" . ,(hx :eval modaled-set-main-state hx-format-blank-line hx-no-sel)))
-    (,(kbd "M-t") . ("toggle vterm" . vterm-toggle))
+    (,(kbd "M-SPC") . ("toggle vterm" . vterm-toggle))
     (,(kbd "M-h") . ("split horizontally" . ,(hx :eval split-window-horizontally other-window)))
     (,(kbd "M-v") . ("split vertically" . ,(hx :eval split-window-vertically other-window)))
     (,(kbd "M-q") . ("delete window" . delete-window))
