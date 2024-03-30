@@ -45,6 +45,7 @@
              org-backward-heading-same-level)
   :hook
   (org-mode . org-indent-mode)
+  (org-capture-mode . modaled-set-insert-state)
   :custom
   (org-babel-python-mode 'python-ts-mode)
   :custom-face

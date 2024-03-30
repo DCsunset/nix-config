@@ -283,7 +283,8 @@
   (magit-pre-refresh . diff-hl-magit-pre-refresh)
   (magit-post-refresh . diff-hl-magit-post-refresh)
   ;; refresh magit after saving buffer
-  (after-save . magit-after-save-refresh-status))
+  (after-save . magit-after-save-refresh-status)
+  (git-commit-mode . modaled-set-insert-state))
 
 (use-package magit-todos
   :commands magit-todos-mode

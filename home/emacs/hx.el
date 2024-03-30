@@ -419,19 +419,26 @@ Set mark when MARKING is t."
       (goto-char (- (cdr region) 2)))))
 
 (defun hx-join-lines ()
-  "Join lines in selecions.
+  "Join lines in selections.
 
 If the selection is within one line, join the next line."
   (interactive)
   (let* ((region (hx-region))
          (beg (car region))
-         (end (cdr region)))
+         ;; line-number-at-pos is not inclusive
+         (end (1- (cdr region)))
+         (beg-line (line-number-at-pos beg))
+         (end-line (line-number-at-pos end))
+         (lines (if (= beg-line end-line)
+                    1
+                  (- end-line beg-line))))
     (save-excursion
-      (when (= (line-number-at-pos beg) (line-number-at-pos end))
-        (goto-char end)
-        (forward-line 1)
-        (setq end (point)))
-      (join-line nil beg end))))
+      (dotimes (_ lines)
+        (goto-char beg)
+        (end-of-line)
+        (delete-char 1)
+        (delete-horizontal-space)
+        (insert " ")))))
 
 
 ;; match mode
@@ -966,13 +973,22 @@ Should be called only before entering multiple-cursors-mode."
     ;; unset C-u for it to be used in vterm
     (,(kbd "C-u") . nil)))
 
-(modaled-define-default-state
-  '("major" dired-mode)
-  '("insert" vterm-mode xeft-mode)
-  '("normal"))
+(setq modaled-init-state-fn
+      (lambda ()
+        (cond
+         ((memq major-mode '(dired-mode))
+          "major")
+         ((memq major-mode '(vterm-mode xeft-mode))
+          "insert")
+         (t "normal"))))
+(setq modaled-main-state-fn
+      (lambda ()
+        (cond
+         ((memq major-mode '(dired-mode))
+          "major")
+         (t "normal"))))
 
-(setq modaled-main-state-alist
-      '(((vterm-mode xeft-mode) . "normal")))
+(modaled-setup)
 
 ;; translate terminal \\e to [escape]
 (hx-esc-mode 1)

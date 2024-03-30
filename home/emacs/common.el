@@ -50,16 +50,19 @@
             nerd-icons-devicon))
 
 (use-package modaled
-  :commands (modaled-set-state
+  :commands (modaled-setup
+             modaled-set-state
              modaled-define-keys
              modaled-define-state-keys
-             modaled-set-default-state
+             modaled-set-init-state
              modaled-set-main-state
-             modaled-get-main-state
              modaled-define-substate-keys
              modaled-get-substate-mode
-             modaled-define-default-state
              modaled-enable-substate-on-state-change))
+(defun modaled-set-insert-state ()
+  "Set insert modaled state."
+  (interactive)
+  (modaled-set-state "insert"))
 
 ;; Define normal states early so later substates can override them
 (modaled-define-state "insert"
