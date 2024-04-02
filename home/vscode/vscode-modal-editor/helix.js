@@ -59,7 +59,7 @@ module.exports = {
 			"modalEditor.setNormalMode"
 		],
 		d: [
-			"modalEditor.cut",
+			"modalEditor.delete",
 			"modalEditor.setNormalMode"
 		],
 		p: repeatable("modalEditor.paste"),
@@ -96,7 +96,7 @@ module.exports = {
 
 		// Changes
 		c: recordChange([
-			"modalEditor.cut",
+			"modalEditor.delete",
 			"modalEditor.setInsertMode"
 		]),
 		i: recordChange("modalEditor.setInsertMode"),
