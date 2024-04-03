@@ -46,6 +46,15 @@
   :hook
   (org-mode . org-indent-mode)
   (org-capture-mode . modaled-set-insert-state)
+  ;; don't pair angle bracket (used in tempo) in electric pair mode
+  (org-mode . (lambda ()
+                (setq-local
+                 electric-pair-inhibit-predicate
+                 `(lambda (c)
+                    (if (char-equal c ?<)
+                        t
+                      ;; use the original pred
+                      (,electric-pair-inhibit-predicate c))))))
   :custom
   (org-babel-python-mode 'python-ts-mode)
   :custom-face

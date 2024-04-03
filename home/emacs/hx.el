@@ -3,35 +3,42 @@
 (use-package highlight
   :commands (hlt-unhighlight-region hlt-highlight-region))
 
-(use-package surround
-  :commands (surround--get-pair-bounds
-             surround--make-pair)
-  :init
-  ;; global config
-  (setq surround-pairs
-        '(("("  . ")")
-          ("{"  . "}")
-          ("["  . "]")
-          ("<"  . ">")
-          ("'"  . "'")
-          ("`"  . "`")
-          ("\"" . "\"")))
-  ;; helper function
-  (defun update-pairs (remove-list add-list)
-    "Update surround-pairs in local var with REMOVE-LIST and ADD-LIST."
-    (setq-local
-     surround-pairs
-     (-concat add-list
-              (--remove (member (car it) remove-list)
-                        surround-pairs))))
+;; global pair config
+(defvar hx-matching-pairs
+  '((?\( . ?\))
+    (?\{ . ?\})
+    (?\[ . ?\])
+    (?\< . ?\>)
+    (?\' . ?\')
+    (?\` . ?\`)
+    (?\" . ?\")))
+;; helper functions
+(defun hx-update-pairs (remove-list add-list)
+  "Update matchings-pairs in local var with REMOVE-LIST and ADD-LIST."
+  (setq-local
+   hx-matching-pairs
+   (-concat add-list
+            (--remove (member (car it) remove-list)
+                      hx-matching-pairs))))
+(defun hx-make-pair (char)
+  "Make pair based on CHAR."
+  (or (assq char hx-matching-pairs)
+      (rassq char hx-matching-pairs)
+      (cons char char)))
+
+;; for matching pairs
+(use-package expand-region
+  :commands (er/mark-outside-pairs
+             er/mark-outside-quotes)
   :hook  ; set different pairs based on major mode
-  (emacs-lisp-mode . (lambda () (update-pairs '("'" "`") '(("`" . "'")))))
-  (rust-ts-mode . (lambda () (update-pairs '() '(("|" . "|")))))
-  (latex-mode . (lambda () (update-pairs '() '(("$" . "$")))))
-  (org-mode . (lambda () (update-pairs '() '(("~" . "~")
-                                             ("=" . "=")
-                                             ("/" . "/")
-                                             ("_" . "_"))))))
+  (emacs-lisp-mode . (lambda () (hx-update-pairs '("'" "`") '(("`" . "'")))))
+  (rust-ts-mode . (lambda () (hx-update-pairs '() '(("|" . "|")))))
+  (latex-mode . (lambda () (hx-update-pairs '() '(("$" . "$")))))
+  (org-mode . (lambda () (hx-update-pairs '() '(("~" . "~")
+                                                ("=" . "=")
+                                                ("/" . "/")
+                                                ("_" . "_"))))))
+
 
 ;; hx manages its own mark so that it can remove mark and cut region correctly
 ;; disable the transient mark mode
@@ -143,13 +150,13 @@ Toggle it when ARG is nil or 0."
   "Highlight the current region."
   ; use 'region as the highlight face
   (let ((region (hx-region)))
-    (hlt-highlight-region (car region) (cdr region) 'region)))
+    (hlt-highlight-region (car region) (cdr region))))
 
 (defun hx-unhighlight ()
   "Unhighlight current region."
   ; only unhighlight 'region face
   (let ((region (hx-region)))
-    (hlt-unhighlight-region (car region) (cdr region) 'region)))
+    (hlt-unhighlight-region (car region) (cdr region))))
 
 (defun hx-set-mark (pos)
   "Set mark in hx to POS."
@@ -443,59 +450,56 @@ If the selection is within one line, join the next line."
 
 ;; match mode
 
-(defun hx-get-surround-pair (&optional chars)
-  "Return surround pair that covers point (inclusive).
+(defun hx-get-surround-pair (&optional type)
+  "Return region of surrounding pair that covers point.
 
-With CHARS, only search for pairs involving them.
-By default, all chars in the pair are searched.
-Specific LEFT-IN or RIGHT-IN to make sure cursor is strictly inside,"
-  (let* ((pairs (if chars
-                    (mapcar #'surround--make-pair chars)
-                  surround-pairs))
-         (result (seq-reduce (lambda (final pair)
-                               (let* ((at-same-pair (and (equal (car pair) (cdr pair))
-                                                         (equal (car pair) (string (char-after (point))))))
-                                      ;; get-pair-bounds doesn't know whether it's at beg or end
-                                      ;; use sexp if not nil
-                                      (sexp-bounds (when (and (equal (car pair) (cdr pair))
-                                                              (equal (car pair) (string (char-after (point)))))
-                                                     (when-let ((bnds (bounds-of-thing-at-point 'sexp)))
-                                                       (if (= (car bnds) (point))
-                                                           ;; point at beg
-                                                           bnds
-                                                         ;; when point at end, move outside
-                                                         ;; otherwise, it might be bounds of things inside
-                                                         (save-excursion
-                                                           (forward-char 1)
-                                                           (bounds-of-thing-at-point 'sexp))))))
-                                      (bounds (or sexp-bounds
-                                                  (ignore-errors (surround--get-pair-bounds (car pair) 'outer)))))
-                                 (if (and bounds
-                                          (or (not final)
-                                              (< (sizeof-range bounds)
-                                                 (sizeof-range final))))
-                                     bounds
-                                   final)))
-                             pairs
-                             nil)))
-    (when result
-      (cons (car result) (1- (cdr result))))))
+Optional TYPE can be \\='quote or \\='bracket."
+  (let* ((get-region (lambda (fn)
+                       (ignore-errors
+                           (funcall fn)
+                           (cons (region-beginning)
+                                 (region-end)))))
+         (quote-regions (when (or (not type)
+                                  (eq type 'quote))
+                          (mapcar (lambda (i)
+                                    (set-mark nil)
+                                    (save-mark-and-excursion
+                                      (forward-char i)
+                                      (funcall get-region #'er/mark-outside-quotes)))
+                                  ;; try both this pos or next (for inclusive cursor)
+                                  '(0 1))))
+         (bracket-regions (when (or (not type)
+                                    (eq type 'bracket))
+                            (mapcar (lambda (i)
+                                      (set-mark nil)
+                                      (save-mark-and-excursion
+                                        (forward-char i)
+                                        (funcall get-region #'er/mark-outside-pairs)))
+                                    '(0 1)))))
+    ;; return smallest region by weight
+    (--min-by (cond
+               ((not it) t)
+               ((not other) nil)
+               (t
+                (let ((it-in (within-range (point) it))
+                      (other-in (within-range (point) other)))
+                  (if (eq it-in other-in)
+                      (> (sizeof-range it) (sizeof-range other))
+                    other-in))))
+              (append quote-regions bracket-regions))))
 
-(defun hx-match-char (&optional char direction)
+(defun hx-match-char (&optional type)
   "Go to matching surrounding char at current point.
 
-Optional left CHAR and DIRECTION (to move to outer) can be specified."
+Optional TYPE and can be specified.
+See `hx-get-surround-pair' for TYPE."
   (interactive)
   (when-let* ((bounds (save-excursion
-                        (pcase direction
-                          ('left (forward-char -1))
-                          ('right (forward-char 1)))
-                        (hx-get-surround-pair (and char '(char)))))
+                        (hx-get-surround-pair type)))
               (beg (car bounds))
               (end (cdr bounds)))
-    (if (or (eq direction 'right)
-            (eq (point) beg))
-        (goto-char end)
+    (if (eq (point) beg)
+        (goto-char (1- end))
       (goto-char beg))))
 
 (defun hx-match-tag ()
@@ -505,24 +509,30 @@ Optional left CHAR and DIRECTION (to move to outer) can be specified."
     ((guard (memq major-mode '(jtsx-jsx-mode jtsx-tsx-mode)))
      (jtsx-jump-jsx-element-tag-dwim))))
 
-(defun hx-match-select (ends &optional char)
+(defun hx-match-select (&optional type ends at-point)
   "Select current matching pair with optional CHAR.
 
+See `hx-get-surround-pair' for TYPE.
 ENDS can be one of the following:
-'outer Select around the pair including itself
-'inner Select only context inside the pair."
-  (when-let* ((bounds (hx-get-surround-pair (and char '(char))))
+\\='outer: Select around the pair including itself
+\\='inner: (default) Select only context inside the pair.
+AT-POINT means to make sure point is at beg or end."
+  (when-let* ((bounds (hx-get-surround-pair type))
               (beg (car bounds))
               (end (cdr bounds)))
-    (pcase ends
-      ('inner (goto-char (1- end))
+    (when (and at-point
+               (not (eq beg (point)))
+               (not (eq end (point))))
+      (error "Point not at matching pair"))
+    (pcase (or ends 'inner)
+      ('inner (goto-char (2- end))
               (hx-set-mark (1+ beg)))
-      ('outer (goto-char end)
+      ('outer (goto-char (1- end))
               (hx-set-mark beg)))))
 
 (defun hx-match-add (char)
   "Add matching CHAR pair around current selection."
-  (let ((pair (surround--make-pair char))
+  (let ((pair (hx-make-pair char))
         (region (hx-region)))
     ; make sure the mark is set to select inserted chars afterwards
     (when (not hx--mark)
@@ -535,19 +545,18 @@ ENDS can be one of the following:
     (backward-char 1)))
 
 (defun hx-match-replace (char)
-  "Replace matching pair around current selection with CHAR pair.
-If no current selection (region is one char), run `hx-match-select' first."
-  (let* ((pair (surround--make-pair char))
+  "Replace matching pair around current selection or at point with CHAR pair."
+  (let* ((pair (hx-make-pair char))
          (region (let ((reg (hx-region)))
                    (if (> (cdr reg) (1+ (car reg)))
                        reg
-                     ;; run match-select first
-                     (hx-match-select 'outer)
+                     ;; run match-select first and make sure point at one end
+                     (hx-match-select nil 'outer t)
                      (hx-region))))
-         (left (string (char-after (car region))))
-         (right (string (char-before (cdr region)))))
-    (if (not (or (equal right (cdr (assoc left surround-pairs)))
-                 (equal right left)))
+         (left (char-after (car region)))
+         (right (char-before (cdr region))))
+    (if (not (or (eq right (cdr (assoc left hx-matching-pairs)))
+                 (eq right left)))
         (message "Current region not surrounded by matching pair")
       (goto-char (car region))
       (delete-char 1)
@@ -563,7 +572,7 @@ If no current selection (region is one char), run `hx-match-select' first."
   (let* ((region (hx-region))
          (left (char-after (car region)))
          (right (char-before (cdr region))))
-    (if (not (or (equal right (cdr (assoc left surround-pairs)))
+    (if (not (or (equal right (cdr (assoc left hx-matching-pairs)))
                  (equal right left)))
         (message "Current region not surrounded by matching pair")
       (goto-char (car region))
@@ -795,12 +804,12 @@ Should be called only before entering multiple-cursors-mode."
     ("gd" . ("go to def" . ,(hx :let (xref-prompt-for-identifier nil) :eval xref-find-definitions)))
     ;; match mode
     ("mm" . ("match any char" . ,(hx :re-sel :eval hx-match-char)))
-    ("mc" . ("match char" . ,(hx :arg (c "Char: ") :re-sel :eval (hx-match-char arg))))
+    ("mb" . ("match bracket" . ,(hx :re-sel :eval (hx-match-char 'bracket))))
+    ("mq" . ("match quote" . ,(hx :re-sel :eval (hx-match-char 'quote))))
     ("mt" . ("match tag" . ,(hx :re-sel :eval hx-match-tag)))
-    ("mj" . ("left outer pair" . ,(hx :re-sel :eval (hx-match-char nil 'left))))
-    ("m;" . ("right outer pair" . ,(hx :re-sel :eval (hx-match-char nil 'right))))
-    ("msm" . ("select any pair" . ,(hx :re-hl :eval (hx-match-select 'inner))))
-    ("msc" . ("select char pair" . ,(hx :arg (c "Char: ") :re-hl :eval (hx-match-select 'inner (string arg)))))
+    ("msm" . ("select any pair" . ,(hx :re-hl :eval (hx-match-select))))
+    ("msp" . ("select bracket" . ,(hx :re-hl :eval (hx-match-select 'bracket))))
+    ("msq" . ("select quote" . ,(hx :re-hl :eval (hx-match-select 'quote))))
     ("ma" . ("surround with pair" . ,(hx :arg (c "Surround: ") :re-hl :eval modaled-set-main-state (hx-match-add arg))))
     ("mrc" . ("replace surrounding char" . ,(hx :arg (c "Surround replace: ") :re-hl :eval modaled-set-main-state (hx-match-replace arg))))
     ("mrt" . ("rename jsx tag" . ,(hx :re-hl :eval modaled-set-main-state jtsx-rename-jsx-element)))
