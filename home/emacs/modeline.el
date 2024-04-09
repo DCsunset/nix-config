@@ -15,7 +15,7 @@
 
 (defun my-modeline-def-map (cmd1 cmd3)
   "Define mouse map for modeline.
-CMD1 for mouse-1 and CMD3 for mouse-3."
+CMD1 for \\`mouse-1' and CMD3 for \\`mouse-3'."
   (let ((map (make-sparse-keymap)))
     (define-key map [mode-line mouse-1] cmd1)
     (define-key map [mode-line mouse-3] cmd3)
@@ -69,10 +69,26 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
      " ")))
 
 ;;; buffer
+(defun my-buffer-path ()
+  "Get buffer path with home substituted."
+  (when buffer-file-name
+    (replace-regexp-in-string
+     (s-concat "^" (expand-file-name "~"))
+     "~"
+     buffer-file-name)))
+
+(defvar my-modeline--buffer-map
+  (my-modeline-def-map
+   (lambda () (interactive)
+     (when-let ((path (my-buffer-path)))
+       (xclip-set-selection 'clipboard path)))
+   nil))
+
 (my-modeline-def-construct my-modeline-buffer
-  (let ((name (if (not buffer-file-name)
-                  (buffer-name)
-                (shrink-path-file buffer-file-name t))))
+  (let* ((path (my-buffer-path))
+         (name (if path
+                   (shrink-path-file path t)
+                 (buffer-name))))
     (list
      ;; read-only
      (if buffer-read-only
@@ -80,10 +96,11 @@ CMD1 for mouse-1 and CMD3 for mouse-3."
        "")
      ;; name
      (propertize (surround-spaces name)
-                 'face (when (and buffer-file-name
+                 'face (when (and path
                                   (buffer-modified-p))
                          '((t :slant italic :weight bold)))
-                 'help-echo buffer-file-name))))
+                 'help-echo path
+                 'local-map my-modeline--buffer-map))))
 
 ;;; eglot
 (defvar-local my-modeline-eglot nil)

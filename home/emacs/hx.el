@@ -163,6 +163,10 @@ Toggle it when ARG is nil or 0."
   ;; use marker to change pos accordingly when text changes
   (setq hx--mark (if pos (copy-marker pos) nil)))
 
+(defun hx-mark-pos ()
+  "Get mark position."
+  (and hx--mark (marker-position hx--mark)))
+
 (defun hx-region-apply (fn &rest args)
   "Pass region (start end) to function FN."
   (let ((region (hx-region)))
@@ -235,6 +239,9 @@ The following options are available:
                The following definitions supported:
                - (c ARGS): Call `read-char' with args
                - (s ARGS): Call `read-from-minibuffer' with args
+               - (b ARGS): Call `y-or-n-p' with args
+               - (B ARGS): Call `yes-or-no-p' with args
+:save          Save and restore hx state after the command (point, mark, ...)
 :let ARGS      Bind variables in `let' macro using pairs.
 :region        Set native region to `hx-region' for body forms.
 :re-hl         Re-highlight selection.
@@ -263,6 +270,13 @@ The following options are available:
                                    f
                                  `(call-interactively #',f)))
                              (plist-get opts :eval)))
+         (save-wrapper (lambda (f)
+                         (if (not (plist-member opts :save)) f
+                           `(let ((cur (point))
+                                  (pos (hx-mark-pos)))
+                              ,f
+                              (hx-set-mark pos)
+                              (goto-char cur)))))
          (region-wrapper (lambda (f)
                            (if (not (plist-member opts :region)) f
                              ;; transient-mark-mode must be true
@@ -292,12 +306,15 @@ The following options are available:
                      `(apply #',(pcase (car arg-def)
                                   ('c #'read-char)
                                   ('s #'read-from-minibuffer)
+                                  ('b #'y-or-n-p)
+                                  ('B #'yes-or-no-p)
                                   (_ (error
                                       (message "Invalid hx arg def: %s" arg-def))))
                              ',(cdr arg-def)))))
          (let ,let-bindings
            ,(funcall
-             (-compose region-wrapper
+             (-compose save-wrapper
+                       region-wrapper
                        re-hl-wrapper
                        re-sel-wrapper)
              ;; need to catch error to let wrappers finish completely
@@ -522,10 +539,10 @@ AT-POINT means to make sure point is at beg or end."
               (end (cdr bounds)))
     (when (and at-point
                (not (eq beg (point)))
-               (not (eq end (point))))
+               (not (eq (1- end) (point))))
       (error "Point not at matching pair"))
     (pcase (or ends 'inner)
-      ('inner (goto-char (2- end))
+      ('inner (goto-char (- end 2))
               (hx-set-mark (1+ beg)))
       ('outer (goto-char (1- end))
               (hx-set-mark beg)))))
@@ -883,6 +900,8 @@ Should be called only before entering multiple-cursors-mode."
     ("`cu" . ("upper case" . ,(hx :eval (hx-region-apply #'upcase-region))))
     ("`cl" . ("lower case" . ,(hx :eval (hx-region-apply #'downcase-region))))
     ("`cc" . ("capitalized case" . ,(hx :eval (hx-region-apply #'capitalize-region))))
+    ("`sl" . ("sort lines" . ,(hx :arg (b "Ascending?") :save :eval (hx-region-apply (-partial #'sort-lines (not arg))))))
+    ("`sc" . ("sort columns" . ,(hx :arg (b "Ascending?") :save :eval (hx-region-apply (-partial #'sort-columns (not arg))))))
     ;; structural moving/editing
     ("sj" . ("prev" . hx-struct-prev))
     ("s;" . ("next" . hx-struct-next))
