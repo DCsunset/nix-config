@@ -3,13 +3,19 @@
 ;; template completion by inserting <KEY TAB
 (use-package org-tempo
   :after org)
+
 ;; support exporting to markdown
 (use-package ox-md
   :after org)
+
 ;; for CV export
 (use-package org-moderncv
   :after org)
 
+;; for CJK font alignment in table
+(use-package valign-mode
+  :hook
+  (org-mode . valign-mode))
 
 ;;; gtd
 
