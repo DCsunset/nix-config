@@ -145,28 +145,29 @@ CMD1 for \\`mouse-1' and CMD3 for \\`mouse-3'."
    (lambda () (interactive) (flymake-goto-prev-error nil '(:note)))))
 
 (my-modeline-def-construct my-modeline-flymake
-  (list
-   " "
-   (propertize
-    (concat (propertize (nerd-icons-codicon "nf-cod-error")
-                        'face 'error)
-               " "
-               (my-modeline--flymake-count :error))
-    'local-map my-modeline--flymake-error-map)
-   " "
-   (propertize
-    (concat (propertize (nerd-icons-codicon "nf-cod-warning")
-                        'face 'warning)
-               " "
-               (my-modeline--flymake-count :warning))
-    'local-map my-modeline--flymake-warning-map)
-   " "
-   (propertize
-    (concat (nerd-icons-codicon "nf-cod-info")
-            " "
-            (my-modeline--flymake-count :note))
-    'local-map my-modeline--flymake-note-map)
-   " "))
+  (when flymake-mode
+    (list
+     " "
+     (propertize
+      (concat (propertize (nerd-icons-codicon "nf-cod-error")
+                          'face 'error)
+              " "
+              (my-modeline--flymake-count :error))
+      'local-map my-modeline--flymake-error-map)
+     " "
+     (propertize
+      (concat (propertize (nerd-icons-codicon "nf-cod-warning")
+                          'face 'warning)
+              " "
+              (my-modeline--flymake-count :warning))
+      'local-map my-modeline--flymake-warning-map)
+     " "
+     (propertize
+      (concat (nerd-icons-codicon "nf-cod-info")
+              " "
+              (my-modeline--flymake-count :note))
+      'local-map my-modeline--flymake-note-map)
+     " ")))
 
 ;;; git
 (defvar-local my-modeline--git-info nil
