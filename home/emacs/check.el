@@ -7,7 +7,8 @@
   (setq flymake-cspell-diagnostic-type :note)
   :config
   (flymake-cspell-set-language-ids
-   ("elisp" emacs-lisp-mode)))
+   ("elisp" emacs-lisp-mode)
+   ("org" org-mode)))
 
 (use-package flymake
   :commands flymake-mode)
@@ -23,7 +24,8 @@
     (unless (derived-mode-p
              'minibuffer-mode
              'vterm-mode
-             'special-mode)
+             'special-mode
+             'org-agenda-mode)
       (flymake-cspell-setup)
       (flymake-mode 1))))
 

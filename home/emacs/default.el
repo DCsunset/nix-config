@@ -13,7 +13,7 @@
   :config
   (setq default-text-scale-amount 12))
 ;; Set default font size for GUI
-(set-frame-font "Monospace 14" nil t)
+(set-frame-font "Monospace 15" nil t)
 
 (use-package minions
   :commands minions-minor-modes-menu)
@@ -162,27 +162,11 @@
 (add-hook 'modaled-dired-substate-mode-hook
           #'modaled-dired-update)
 
-;;; treemacs
-(use-package treemacs
-  :commands (treemacs treemacs-root-up treemacs-root-down treemacs-load-theme
-                      treemacs-RET-action treemacs-add-and-display-current-project))
-;; use icon fonts to enable it in terminal
-(use-package treemacs-nerd-icons
+(use-package dired-sidebar
+  :commands (dired-sidebar-toggle-sidebar
+             dired-sidebar-subtree-toggle)
   :config
-  (treemacs-load-theme "nerd-icons"))
-;; treemacs specific keybindings
-(modaled-define-substate "treemacs")
-(modaled-define-keys
-  :substates '("treemacs")
-  :bind
-  `(("<" . ("root up" . treemacs-root-up))
-    (">" . ("root down" . treemacs-root-down))
-    ("o" . ("open/close" . treemacs-RET-action))
-    ("." . ("reset root" . treemacs-add-and-display-current-project))))
-(modaled-enable-substate-on-state-change
-  "treemacs"
-  :states '("normal" "select")
-  :major '(treemacs-mode))
+  (setq dired-sidebar-theme 'nerd))
 
 (use-package which-key
   :commands which-key-mode

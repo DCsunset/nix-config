@@ -621,7 +621,8 @@ AT-POINT means to make sure point is at beg or end."
   (interactive)
   (pcase major-mode
    ('org-mode (org-cycle))
-   ('magit-status-mode (call-interactively #'magit-section-toggle))))
+   ('magit-status-mode (magit-section-toggle))
+   ('dired-sidebar-mode (dired-sidebar-subtree-toggle))))
 
 
 ;; structural movement
@@ -830,9 +831,8 @@ Should be called only before entering multiple-cursors-mode."
     ("ma" . ("surround with pair" . ,(hx :arg (c "Surround: ") :re-hl :eval modaled-set-main-state (hx-match-add arg))))
     ("mrc" . ("replace surrounding char" . ,(hx :arg (c "Surround replace: ") :re-hl :eval modaled-set-main-state (hx-match-replace arg))))
     ("mrt" . ("rename jsx tag" . ,(hx :re-hl :eval modaled-set-main-state jtsx-rename-jsx-element)))
-    ;; C-i is the same as TAB for kbd and in terminal
-    (,(kbd "C-i") . ("jump forward" . xref-go-forward))
-    (,(kbd "C-o") . ("jump backward" . xref-go-back))
+    (,(kbd "M-[") . ("jump forward" . xref-go-forward))
+    (,(kbd "M-]") . ("jump backward" . xref-go-back))
     ;; changes
     ("i" . ("insert before" . ,(hx :eval hx-no-sel (modaled-set-state "insert"))))
     ("a" . ("insert after" . ,(hx :eval hx-no-sel (modaled-set-state "insert") forward-char)))
@@ -868,7 +868,7 @@ Should be called only before entering multiple-cursors-mode."
     (" f" . ("find file (projectile)" . projectile-find-file))
     (" F" . ("find file (dired)" . find-file))
     (" b" . ("switch to buffer" . switch-to-buffer))
-    (" d" . ("directory tree" . treemacs))
+    (" d" . ("directory tree" . dired-sidebar-toggle-sidebar))
     (" ?" . ("search symbol" . apropos))
     (" k" . ("show eldoc" . hx-show-eldoc))
     ;; multiple cursors
@@ -918,6 +918,8 @@ Should be called only before entering multiple-cursors-mode."
     ("sej" . ("prev error" . ,(hx :eval (flymake-goto-prev-error nil '(:error :warning) t))))
     ("se;" . ("next error" . ,(hx :eval (flymake-goto-next-error nil '(:error :warning) t))))
     ;; misc
+    ;; note: TAB is the same as C-i in terminal
+    ((,(kbd "TAB") ,(kbd "<tab>")) . ("toggle visibility" . hx-toggle-visibility))
     ("!" . ("run shell command" . shell-command))
     ("|" . ("eval expr" . eval-expression))
     ("\\" . ("eval region and print" . ,(hx :eval (hx-region-apply #'eval-region t))))
@@ -986,7 +988,6 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-;") . ("right window" . windmove-right))
     (,(kbd "M-l") . ("up window" . windmove-up))
     (,(kbd "M-k") . ("down window" . windmove-down))
-    (,(kbd "C-v") . ("toggle visibility" . hx-toggle-visibility))
     (,(kbd "C-s") . ("save" . hx-save))
     (,(kbd "C-a") . ("abort" . hx-abort))
     (,(kbd "C-q") . ("quit" . save-buffers-kill-terminal))))
