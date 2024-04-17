@@ -33,8 +33,6 @@
       nerd-icons-dired
       nerd-icons-completion
       projectile
-      treemacs
-      treemacs-nerd-icons
       which-key
       vertico
       marginalia
