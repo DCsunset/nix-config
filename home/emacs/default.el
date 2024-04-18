@@ -106,9 +106,14 @@
 
 ;;; projectile
 (use-package projectile
-  :commands (projectile-mode projectile-find-file)
+  :commands (projectile-mode
+             projectile-find-file
+             projectile-ripgrep)
   :init
   (projectile-mode 1))
+
+;;; for projectile-ripgrep
+(use-package rg)
 
 ;;; dired
 (use-package nerd-icons-dired
@@ -122,45 +127,49 @@
              dired-toggle-read-only)
   :hook
   (dired-mode . dired-hide-details-mode))
-;; dired keybindings for all states
-(modaled-define-substate "dired" :no-suppress t)
+
+;; dired mode
+(modaled-define-substate "dired")
 (modaled-define-keys
   :substates '("dired")
   :bind
-  ;; FIXME: allow exiting
-  `(("'r" . ("toggle editing mode" . dired-toggle-read-only))
-    ("'d" . ("toggle details" . dired-hide-details-mode))))
-;; dired specific keybindings for major state
-(modaled-define-substate "dired-major" :no-suppress t)
-(modaled-define-keys
-  :substates '("dired-major")
-  :bind
-  `(("l" . ("up" . previous-line))
-    ("k" . ("down" . next-line))
-    ("j" . ("go to parent" . dired-up-directory))
-    (";" . ("open" . dired-find-file))))
+  ;; TODO: allow exiting
+  `(("'r" . ("toggle read-only mode" . dired-toggle-read-only))
+    ("'d" . ("toggle details" . dired-hide-details-mode))
+    ("<" . ("go to parent" . dired-up-directory))
+    (">" . ("open" . dired-find-file))))
   ;; ("'q" "cancel edit" nil (call-interactively #'dired-toggle-read-only))
   ;; ("'x" "apply edit" nil (call-interactively #'dired-toggle-read-only)))
-;; enable dired substate only for dired mode  & not insert state
 (modaled-enable-substate-on-state-change
   "dired"
-  :states '("major" "normal")
-  :major '(dired-mode wdired-mode))
-(modaled-enable-substate-on-state-change
-  "dired-major"
-  :states '("major")
+  :states '("normal" "select")
   :major '(dired-mode))
-(defun modaled-dired-update ()
-  "Update dired-major settings like curosr and hl-line when state changed."
-  (let ((enabled modaled-dired-major-substate-mode))
-    (setq cursor-type (if enabled nil 'box))
+
+(defun dired-highlight ()
+  "Highlight line for Dired."
+  (let ((enabled modaled-dired-substate-mode))
     (hl-line-mode (if enabled 1 -1))))
-(add-hook 'modaled-dired-major-substate-mode-hook
-          #'modaled-dired-update)
-;; The above hook won't run when changing to wdired-mode
-;; Must add the following hook as well
+
 (add-hook 'modaled-dired-substate-mode-hook
-          #'modaled-dired-update)
+          #'dired-highlight)
+
+;;; wdired mode
+(modaled-define-substate "wdired")
+(modaled-define-keys
+  :substates '("wdired")
+  :bind
+  ;; TODO: allow exiting
+  `(("'r" . ("toggle read-only mode" . dired-toggle-read-only))
+    ("'d" . ("toggle details" . dired-hide-details-mode))
+    ("<" . ("go to parent" . dired-up-directory))
+    (">" . ("open" . dired-find-file))))
+  ;; ("'q" "cancel edit" nil (call-interactively #'dired-toggle-read-only))
+  ;; ("'x" "apply edit" nil (call-interactively #'dired-toggle-read-only)))
+(modaled-enable-substate-on-state-change
+  "dired"
+  :states '("normal" "select")
+  :major '(wdired-mode))
+
 
 (use-package dired-sidebar
   :commands (dired-sidebar-toggle-sidebar

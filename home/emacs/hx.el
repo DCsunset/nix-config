@@ -621,7 +621,7 @@ AT-POINT means to make sure point is at beg or end."
   (interactive)
   (pcase major-mode
    ('org-mode (org-cycle))
-   ('magit-status-mode (magit-section-toggle))
+   ('magit-status-mode (call-interactively #'magit-section-toggle))
    ('dired-sidebar-mode (dired-sidebar-subtree-toggle))))
 
 
@@ -723,6 +723,26 @@ AT-POINT means to make sure point is at beg or end."
   (if multiple-cursors-mode
       (mc/disable-multiple-cursors-mode)
     (mc/maybe-multiple-cursors-mode)))
+
+(defun hx-toggle-cursor-on-click (event)
+  "Toggle a cursor on mouse click EVENT."
+  (interactive "e")
+  (mouse-minibuffer-check event)
+  ;; Use event-end in case called from mouse-drag-region.
+  ;; If EVENT is a click, event-end and event-start give same value.
+  (let ((position (event-end event)))
+    (if (not (windowp (posn-window position)))
+        (error "Position not in text area of window"))
+    (select-window (posn-window position))
+    (let ((pt (posn-point position)))
+      (if (numberp pt)
+          ;; is there a fake cursor with the actual *point* right where we are?
+          (let ((existing (mc/fake-cursor-at-point pt)))
+            (if existing
+                (mc/remove-fake-cursor existing)
+              (save-excursion
+                (goto-char pt)
+                (mc/create-fake-cursor-at-point))))))))
 
 (defun hx-toggle-cursor ()
   "Toggle a cursor at point."
@@ -865,7 +885,8 @@ Should be called only before entering multiple-cursors-mode."
     (" P" . ("clipboard paste before" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) -1) hx-no-sel)))
     (" p" . ("clipboard paste after" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) +1) hx-no-sel)))
     (" y" . ("copy to clipboard" . ,(hx :eval modaled-set-main-state (xclip-set-selection 'clipboard (hx-region-string)))))
-    (" f" . ("find file (projectile)" . projectile-find-file))
+    (" f" . ("find file in project" . projectile-find-file))
+    (" s" . ("search in project" . projectile-ripgrep))
     (" F" . ("find file (dired)" . find-file))
     (" b" . ("switch to buffer" . switch-to-buffer))
     (" d" . ("directory tree" . dired-sidebar-toggle-sidebar))
@@ -875,6 +896,7 @@ Should be called only before entering multiple-cursors-mode."
     (" c" . ("toggle multiple-cursors-mode" . hx-toggle-multiple-cursors))
     (" C" . ("remove all cursors" . hx-remove-cursors))
     ("C" . ("add cursor and move next line" . ,(hx :eval hx-add-cursor next-line)))
+    (,(kbd "M-<mouse-1>") . ("add cursor on click" . hx-toggle-cursor-on-click))
     (,(kbd "M-C") . ("Add cursor and move prev line" . ,(hx :eval hx-add-cursor previous-line)))
     (,(kbd "M-c") . ("toggle a cursor at point" . hx-toggle-cursor))
     ;; gtd
@@ -988,6 +1010,10 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-;") . ("right window" . windmove-right))
     (,(kbd "M-l") . ("up window" . windmove-up))
     (,(kbd "M-k") . ("down window" . windmove-down))
+    (,(kbd "C-M-j") . ("shrink window horizontally" . shrink-window-horizontally))
+    (,(kbd "C-M-;") . ("enlarge window horizontally" . enlarge-window-horizontally))
+    (,(kbd "C-M-l") . ("enlarge window vertically" . enlarge-window))
+    (,(kbd "C-M-k") . ("shrink window vertically" . shrink-window))
     (,(kbd "C-s") . ("save" . hx-save))
     (,(kbd "C-a") . ("abort" . hx-abort))
     (,(kbd "C-q") . ("quit" . save-buffers-kill-terminal))))
@@ -1000,21 +1026,19 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "C-=") . ("scale increase" . text-scale-increase))
     (,(kbd "C--") . ("scale decrease" . text-scale-decrease))
     ;; unset C-u for it to be used in vterm
-    (,(kbd "C-u") . nil)))
+    (,(kbd "C-u") . nil)
+    ;; unset it to prevent conflict with M-<mouse-1>
+    (,(kbd "M-<down-mouse-1>") . nil)))
 
 (setq modaled-init-state-fn
       (lambda ()
         (cond
-         ((memq major-mode '(dired-mode))
-          "major")
          ((memq major-mode '(vterm-mode xeft-mode))
           "insert")
          (t "normal"))))
 (setq modaled-main-state-fn
       (lambda ()
         (cond
-         ((memq major-mode '(dired-mode))
-          "major")
          (t "normal"))))
 
 (modaled-setup)
