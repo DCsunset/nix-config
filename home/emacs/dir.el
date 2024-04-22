@@ -123,3 +123,7 @@
   :config
   (setq dired-sidebar-theme 'nerd))
 
+(use-package consult
+  :commands (consult-ripgrep
+             consult-fd
+             consult-goto-line))

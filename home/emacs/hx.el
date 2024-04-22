@@ -833,6 +833,7 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "C-d") . ("scroll down" . ,(hx :re-sel :eval (funcall-interactively #'next-line 10))))
     ;; goto mode
     ("gg" . ("go to line" . ,(hx :arg-desc "p" :re-sel :eval (forward-line (- (car l-args) (line-number-at-pos))))))
+    ("gi" . ("go to line interactively" . consult-goto-line))
     ("ge" . ("end of file" . ,(hx :re-sel :eval (goto-char (point-max)))))
     ("gj" . ("start of line" . ,(hx :re-sel :eval beginning-of-line)))
     ("g;" . ("end of line" . ,(hx :re-sel :eval end-of-line (re-search-backward ".\\|^"))))  ; move to last char if exists
@@ -886,9 +887,11 @@ Should be called only before entering multiple-cursors-mode."
     (" P" . ("clipboard paste before" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) -1) hx-no-sel)))
     (" p" . ("clipboard paste after" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) +1) hx-no-sel)))
     (" y" . ("copy to clipboard" . ,(hx :eval modaled-set-main-state (xclip-set-selection 'clipboard (hx-region-string)))))
-    (" f" . ("find file in project" . projectile-find-file))
-    (" s" . ("search in project" . projectile-ripgrep))
+    (" f" . ("find file (projectile)" . projectile-find-file))
     (" F" . ("find file (dired)" . find-file))
+    (,(kbd "SPC M-f") . ("find file (consult)" . consult-fd))
+    (" s" . ("search (projectile)" . projectile-ripgrep))
+    (,(kbd "SPC M-s") . ("search (consult)" . consult-ripgrep))
     (" b" . ("switch to buffer" . switch-to-buffer))
     (" d" . ("directory tree" . dired-sidebar-toggle-sidebar))
     (" ?" . ("search symbol" . apropos))
@@ -965,18 +968,6 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-t") . ("tempo complete" . ,(hx :let (tempo-match-finder my-tempo-match-finder) :eval tempo-complete-tag)))
     ;; this makes pasting work in GUI
     (,(kbd "C-S-v") . ("paste from clipboard" . ,(hx :eval (insert (xclip-get-selection 'clipboard)))))))
-;; (add-hook
-;;  'modaled-insert-state-mode-hook
-;;  (lambda ()
-;;    ;; box cursor shape for VTE-based terminal
-;;    (unless (display-graphic-p)
-;;      (send-string-to-terminal "\e[6 q"))))
-
-;; major-mode specific keys
-(modaled-define-keys
-  :states '("major")
-  :bind
-  `(("i" . ("NORMAL state" . ,(hx :eval (modaled-set-state "normal"))))))
 
 (defun hx-save ()
   "Save buffer or finish editing."
