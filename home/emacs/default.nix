@@ -6,6 +6,7 @@
     package = with pkgs; emacs29;
     # emacs packages
     extraPackages = epkgs: with epkgs; [
+      openwith
       rg
       dired-sidebar
       valign
@@ -89,6 +90,7 @@
       ./tempo.el
       ./check.el
       ./org.el
+      ./dir.el
       ./default.el
     ];
   };

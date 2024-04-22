@@ -216,8 +216,8 @@ LOC can be `current' or `other'."
 (modaled-define-keys
   :substates '("org")
   :bind
-  `(("'o" . ("org open (other window)" . ,(hx :eval (org-open 'other))))
-    (([return] ,(kbd "RET")) . ("org open" . ,(hx :eval (org-open 'current))))
+  `((,(kbd "M-RET") . ("org open (other window)" . ,(hx :eval (org-open 'other))))
+    (,(kbd "RET") . ("org open" . ,(hx :eval (org-open 'current))))
     ("'w" . ("org edit" . org-edit-special))
     ("'e" . ("org export" . org-export-dispatch))
     ("'it" . ("org insert template" . ,(hx :eval

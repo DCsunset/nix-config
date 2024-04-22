@@ -145,7 +145,7 @@ CMD1 for \\`mouse-1' and CMD3 for \\`mouse-3'."
    (lambda () (interactive) (flymake-goto-prev-error nil '(:note)))))
 
 (my-modeline-def-construct my-modeline-flymake
-  (when flymake-mode
+  (when (bound-and-true-p flymake-mode)
     (list
      " "
      (propertize

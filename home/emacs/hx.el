@@ -237,7 +237,7 @@ The following options are available:
                Argument will be (&rest l-args).
 :arg DEF       Read argument for eval forms. Argument will be arg.
                The following definitions supported:
-               - (c ARGS): Call `read-char' with args
+               - (c ARGS): Call `read-char-from-minibuffer' with args
                - (s ARGS): Call `read-from-minibuffer' with args
                - (b ARGS): Call `y-or-n-p' with args
                - (B ARGS): Call `yes-or-no-p' with args
@@ -304,7 +304,7 @@ The following options are available:
        (interactive ,arg-desc)
        (let ((arg ,(when arg-def
                      `(apply #',(pcase (car arg-def)
-                                  ('c #'read-char)
+                                  ('c #'read-char-from-minibuffer)
                                   ('s #'read-from-minibuffer)
                                   ('b #'y-or-n-p)
                                   ('B #'yes-or-no-p)
@@ -622,7 +622,8 @@ AT-POINT means to make sure point is at beg or end."
   (pcase major-mode
    ('org-mode (org-cycle))
    ('magit-status-mode (call-interactively #'magit-section-toggle))
-   ('dired-sidebar-mode (dired-sidebar-subtree-toggle))))
+   ('dired-sidebar-mode (dired-sidebar-subtree-toggle))
+   ((or 'dired-mode 'wdired-mode) (dired-find-file))))
 
 
 ;; structural movement
@@ -892,6 +893,7 @@ Should be called only before entering multiple-cursors-mode."
     (" d" . ("directory tree" . dired-sidebar-toggle-sidebar))
     (" ?" . ("search symbol" . apropos))
     (" k" . ("show eldoc" . hx-show-eldoc))
+    (" r" . ("reload buffer" . revert-buffer))
     ;; multiple cursors
     (" c" . ("toggle multiple-cursors-mode" . hx-toggle-multiple-cursors))
     (" C" . ("remove all cursors" . hx-remove-cursors))
@@ -942,13 +944,14 @@ Should be called only before entering multiple-cursors-mode."
     ;; misc
     ;; note: TAB is the same as C-i in terminal
     ((,(kbd "TAB") ,(kbd "<tab>")) . ("toggle visibility" . hx-toggle-visibility))
-    ("!" . ("run shell command" . shell-command))
+    (":" . ("run shell command" . shell-command))
     ("|" . ("eval expr" . eval-expression))
     ("\\" . ("eval region and print" . ,(hx :eval (hx-region-apply #'eval-region t))))
     (,(kbd "M-\\") . ("eval region" . ,(hx :eval (hx-region-apply #'eval-region))))
-    (":" . ("run command" . execute-extended-command))
     ("q" . ("quit window" . quit-window))
     ("Q" . ("kill buffer" . kill-this-buffer))
+    ;; disable return key and backspace key
+    ((,(kbd "RET") ,(kbd "DEL")) . ignore)
     ;; major-mode specific command
     ("'x" . ,(hx :region :let (command (lookup-key (current-local-map) (kbd "C-c C-c")))
                :eval (when command (call-interactively command))))))
@@ -978,24 +981,32 @@ Should be called only before entering multiple-cursors-mode."
 (defun hx-save ()
   "Save buffer or finish editing."
   (interactive)
-  (call-interactively
-   (cond
-    ((bound-and-true-p org-capture-mode) #'org-capture-finalize)
-    ((or (bound-and-true-p git-commit-mode)
-         (eq major-mode 'git-rebase-mode))
-     #'with-editor-finish)
-    (t #'save-buffer))))
+  (cond
+   ((bound-and-true-p org-capture-mode)
+    (org-capture-finalize))
+   ((eq major-mode 'wdired-mode)
+    (wdired-finish-edit)
+    ;; re-highlighting (note mode hook won't be called for some reason)
+    (dired-highlight))
+   ((or (bound-and-true-p git-commit-mode)
+        (eq major-mode 'git-rebase-mode))
+    (call-interactively #'with-editor-finish))
+   (t (save-buffer))))
 
 (defun hx-abort ()
   "Abort editing."
   (interactive)
-  (call-interactively
-   (cond
-    ((bound-and-true-p org-capture-mode) #'org-capture-kill)
-    ((or (bound-and-true-p git-commit-mode)
-         (eq major-mode 'git-rebase-mode))
-     #'with-editor-cancel)
-    (t #'ignore))))
+  (cond
+   ((bound-and-true-p org-capture-mode)
+    (org-capture-kill))
+   ((eq major-mode 'wdired-mode)
+    (wdired-abort-changes)
+    ;; reload buffer to fix icons
+    (revert-buffer)
+    (dired-highlight))
+   ((or (bound-and-true-p git-commit-mode)
+        (eq major-mode 'git-rebase-mode))
+    (call-interactively #'with-editor-cancel))))
 
 ;; common keybindings for all states
 (modaled-define-keys
