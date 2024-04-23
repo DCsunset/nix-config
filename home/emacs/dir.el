@@ -126,4 +126,7 @@
 (use-package consult
   :commands (consult-ripgrep
              consult-fd
-             consult-goto-line))
+             consult-goto-line
+             consult-line
+             consult-imenu
+             consult-buffer))
