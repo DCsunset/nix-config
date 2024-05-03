@@ -208,19 +208,51 @@ Toggle it when ARG is nil or 0."
          (delete-region (point)
                         (line-end-position)))))
 
-; [WIP] record changes
-(modaled-define-local-var hx--last-change nil
-  "Recorded last change.")
-(defun hx-record-change (command)
-  "Record change and return the COMMAND."
-  (setq hx--last-change command)
-  command)
-(defun hx-repeat-change ()
-  "Repeat last change."
-  (interactive)
-  (when hx--last-change
-    (funcall hx--last-change)
-    (setq hx--last-change nil)))
+;; Command records
+;; Used register (symbol):
+;; - m: motion
+;; - c: change
+(modaled-define-local-var hx--command-records nil
+  "Recorded commands.")
+(modaled-define-local-var hx--recording-command nil
+  "Whether it is recording macro for command into specific registers.")
+(modaled-define-local-var hx--running-command-record nil
+  "Whether it is running command record.")
+
+(defun hx-set-command-record (reg record)
+  "Set command RECORD for REG register."
+  (setf (alist-get reg hx--command-records) record))
+
+(defun hx-run-command-record (reg)
+  "Run command recorded in REG."
+  (when-let ((rec (alist-get reg hx--command-records)))
+    (setq hx--running-command-record t)
+    (pcase-let ((`((,fn ,current-prefix-arg ,args ,hx-arg) . ,macro) rec))
+      (apply fn args)
+      (when macro
+        (execute-kbd-macro macro)
+        ;; [escape] won't be recorded in macro
+        (call-interactively (key-binding [escape]))))
+    (setq hx--running-command-record nil)))
+
+(defun hx--start-recording-command (regs)
+  "Start recording command and store it in REGS."
+  ;; discard messages
+  (let ((inhibit-message t)
+        (message-log-max nil))
+    (setq hx--recording-command regs)
+    (start-kbd-macro nil)))
+
+(defun hx--end-recording-command ()
+  "End recording command."
+  (when hx--recording-command
+    (let ((inhibit-message t)
+          (message-log-max nil))
+      (end-kbd-macro nil)
+      (dolist (reg hx--recording-command)
+        (setcdr (alist-get reg hx--command-records) last-kbd-macro))
+      (setq hx--recording-command nil))))
+
 
 (defun hx-no-sel ()
   "Clear selection and disable highlight for it."
@@ -241,6 +273,7 @@ The following options are available:
                - (s ARGS): Call `read-from-minibuffer' with args
                - (b ARGS): Call `y-or-n-p' with args
                - (B ARGS): Call `yes-or-no-p' with args
+:rec REGS      Record this command in registers
 :save          Save and restore hx state after the command (point, mark, ...)
 :let ARGS      Bind variables in `let' macro using pairs.
 :region        Set native region to `hx-region' for body forms.
@@ -262,6 +295,7 @@ The following options are available:
                         parts
                         '())))
          (arg-desc (car (plist-get opts :arg-desc)))
+         (rec-regs (plist-get opts :rec))
          (lambda-args (if arg-desc '(&rest l-args) '()))
          (arg-def (car (plist-get opts :arg)))
          (let-bindings (or (plist-get opts :let) '()))
@@ -303,14 +337,24 @@ The following options are available:
     `(lambda ,lambda-args
        (interactive ,arg-desc)
        (let ((arg ,(when arg-def
-                     `(apply #',(pcase (car arg-def)
-                                  ('c #'read-char-from-minibuffer)
-                                  ('s #'read-from-minibuffer)
-                                  ('b #'y-or-n-p)
-                                  ('B #'yes-or-no-p)
-                                  (_ (error
-                                      (message "Invalid hx arg def: %s" arg-def))))
-                             ',(cdr arg-def)))))
+                     `(or (bound-and-true-p hx-arg)
+                          (apply #',(pcase (car arg-def)
+                                      ('c #'read-char-from-minibuffer)
+                                      ('s #'read-from-minibuffer)
+                                      ('b #'y-or-n-p)
+                                      ('B #'yes-or-no-p)
+                                      (_ (error
+                                          (message "Invalid hx arg def: %s" arg-def))))
+                                 ',(cdr arg-def)))))
+             ;; get current function
+             (this (nth 1 (backtrace-frame 1))))
+         ;; record command and args (only when not running a record)
+         (unless hx--running-command-record
+           (dolist (reg ',rec-regs)
+             (hx-set-command-record reg
+                                    (cons
+                                     (list this current-prefix-arg (when ,arg-desc l-args) arg)
+                                     nil))))
          (let ,let-bindings
            ,(funcall
              (-compose save-wrapper
@@ -321,7 +365,13 @@ The following options are available:
              `(condition-case err
                   (progn ,@eval-forms)
                 (error
-                 (message "%s" (error-message-string err))))))))))
+                 (message "%s" (error-message-string err))))))
+         ;; record all keys in insert state for this command
+         (when (and ',rec-regs
+                    (not hx--running-command-record)
+                    (equal modaled-state "insert"))
+           (setq hx--recording-command t)
+           (hx--start-recording-command ',rec-regs))))))
 
 (defun hx-find-char (char direction offset &optional marking)
   "Find CHAR in DIRECTION and place the cursor with OFFSET from it.
@@ -816,7 +866,7 @@ Should be called only before entering multiple-cursors-mode."
 ;; Note:
 ;; - ' is reserved for major mode specific keybindings
 (modaled-define-keys
-  :states '("major" "normal" "select")
+  :states '("normal" "select")
   :bind
   ;; movement
   `(("j" . ("left" . ,(hx :re-sel :eval backward-char)))
@@ -825,10 +875,10 @@ Should be called only before entering multiple-cursors-mode."
     ("k" . ("down" . ,(hx :re-sel :eval next-line)))
     ("w" . ("next word" . ,(hx :re-hl :eval (hx-next-word (equal modaled-state "normal")))))
     ("b" . ("prev word" . ,(hx :re-hl :eval (hx-previous-word (equal modaled-state "normal")))))
-    ("f" . ("find next char" . ,(hx :arg (c "Find: ") :re-hl :eval (hx-find-char arg +1 -1 (equal modaled-state "normal")))))
-    ("t" . ("find till next char" . ,(hx :arg (c "Till: ") :re-hl :eval (hx-find-char arg +1 -2 (equal modaled-state "normal")))))
-    ("F" . ("find prev char" . ,(hx :arg (c "Find prev: ") :re-hl :eval (hx-find-char arg -1 0 (equal modaled-state "normal")))))
-    ("T" . ("find till prev char" . ,(hx :arg (c "Till prev: ") :re-hl :eval (hx-find-char arg -1 1 (equal modaled-state "normal")))))
+    ("f" . ("find next char" . ,(hx :rec m :arg (c "Find: ") :re-hl :eval (hx-find-char arg +1 -1 (equal modaled-state "normal")))))
+    ("t" . ("find till next char" . ,(hx :rec m :arg (c "Till: ") :re-hl :eval (hx-find-char arg +1 -2 (equal modaled-state "normal")))))
+    ("F" . ("find prev char" . ,(hx :rec m :arg (c "Find prev: ") :re-hl :eval (hx-find-char arg -1 0 (equal modaled-state "normal")))))
+    ("T" . ("find till prev char" . ,(hx :rec m :arg (c "Till prev: ") :re-hl :eval (hx-find-char arg -1 1 (equal modaled-state "normal")))))
     (,(kbd "C-u") . ("scroll up" . ,(hx :re-sel :eval (funcall-interactively #'previous-line 10))))
     (,(kbd "C-d") . ("scroll down" . ,(hx :re-sel :eval (funcall-interactively #'next-line 10))))
     ;; goto mode
@@ -864,12 +914,12 @@ Should be called only before entering multiple-cursors-mode."
     ("A" . ("insert at end of line" . ,(hx :eval hx-no-sel (modaled-set-state "insert") end-of-line)))
     ("o" . ("insert below" . ,(hx :eval hx-no-sel (modaled-set-state "insert") end-of-line newline-and-indent)))
     ("O" . ("insert above" . ,(hx :eval hx-no-sel (modaled-set-state "insert") beginning-of-line newline-and-indent (forward-line -1) indent-according-to-mode)))
-    ("r" . ("replace" . ,(hx :arg (c "Replace: ") :eval modaled-set-main-state (hx-region-replace arg) hx-no-sel)))
+    ("r" . ("replace" . ,(hx :rec c :arg (c "Replace: ") :eval modaled-set-main-state (hx-region-replace arg) hx-no-sel)))
     ("y" . ("copy" . ,(hx :eval modaled-set-main-state (hx-region-apply #'kill-ring-save))))
-    ("d" . ("delete" . ,(hx :eval modaled-set-main-state (hx-region-apply #'delete-region) hx-no-sel)))
-    ("c" . ("change" . ,(hx :eval (modaled-set-state "insert") (hx-region-apply #'delete-region) hx-no-sel)))
-    ("P" . ("paste before" . ,(hx :eval (hx-paste (current-kill 0 t) -1) hx-no-sel)))
-    ("p" . ("paste after" . ,(hx :eval (hx-paste (current-kill 0 t) +1) hx-no-sel)))
+    ("d" . ("delete" . ,(hx :rec c :eval modaled-set-main-state (hx-region-apply #'delete-region) hx-no-sel)))
+    ("c" . ("change" . ,(hx :rec c :eval (modaled-set-state "insert") (hx-region-apply #'delete-region) hx-no-sel)))
+    ("P" . ("paste before" . ,(hx :rec c :eval (hx-paste (current-kill 0 t) -1) hx-no-sel)))
+    ("p" . ("paste after" . ,(hx :rec c :eval (hx-paste (current-kill 0 t) +1) hx-no-sel)))
     (,(kbd "M-P") . ("paste before from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") -1) hx-no-sel)))
     (,(kbd "M-p") . ("paste after from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") +1) hx-no-sel)))
     ("J" . ("join lines" . hx-join-lines))
@@ -877,7 +927,6 @@ Should be called only before entering multiple-cursors-mode."
     ("U" . ("redo" . ,(hx :eval hx-no-sel undo-redo)))
     (">" . ("indent" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-rigidly 2))))
     ("<" . ("unindent" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-rigidly -2))))
-    ("." . ("repeat changes" . hx-repeat-change))
     ("=" . ("format" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-region))))
     (,(kbd "C-c") . ("comment/uncomment" . ,(hx :re-hl :eval (hx-extended-region-apply #'comment-or-uncomment-region))))
     ;; selection
@@ -945,6 +994,8 @@ Should be called only before entering multiple-cursors-mode."
     ("sej" . ("prev error" . ,(hx :eval (flymake-goto-prev-error nil '(:error :warning) t))))
     ("se;" . ("next error" . ,(hx :eval (flymake-goto-next-error nil '(:error :warning) t))))
     ;; misc
+    ("." . ("repeat change" . ,(hx :eval (hx-run-command-record 'c))))
+    (,(kbd "M-.") . ("repeat motion" . ,(hx :eval (hx-run-command-record 'm))))
     ;; note: TAB is the same as C-i in terminal
     ((,(kbd "TAB") ,(kbd "<tab>")) . ("toggle visibility" . hx-toggle-visibility))
     (":" . ("run shell command" . shell-command))
@@ -1003,7 +1054,7 @@ Should be called only before entering multiple-cursors-mode."
 (modaled-define-keys
   :states '("major" "normal" "select" "insert")
   :bind
-  `(([escape] . ("main state" . ,(hx :eval modaled-set-main-state hx-format-blank-line hx-no-sel)))
+  `(([escape] . ("main state" . ,(hx :eval (hx--end-recording-command) modaled-set-main-state hx-format-blank-line hx-no-sel)))
     (,(kbd "M-SPC") . ("toggle vterm" . vterm-toggle))
     (,(kbd "M-h") . ("split horizontally" . ,(hx :eval split-window-horizontally other-window)))
     (,(kbd "M-v") . ("split vertically" . ,(hx :eval split-window-vertically other-window)))
