@@ -2,8 +2,6 @@
 
 ;;; General config
 
-(setq-default delete-by-moving-to-trash t)
-
 ;; UI config
 (tool-bar-mode -1)
 (menu-bar-mode -1)

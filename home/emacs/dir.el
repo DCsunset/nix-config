@@ -1,5 +1,7 @@
 ;; dir related config
 
+(setq-default delete-by-moving-to-trash t)
+
 (use-package openwith
   :commands (openwith-make-extension-regexp
             openwith-mode)
@@ -89,6 +91,7 @@
     ("'u" . ("unmark" . dired-unmark))
     ("'U" . ("unmark all" . dired-unmark-all-marks))
     ("'d" . ("delete" . dired-do-delete))
+    ("'D" . ("delete permanently" . ,(hx :let (delete-by-moving-to-trash nil) :eval dired-do-delete)))
     ("'k" . ("kill (not delete)" . dired-do-kill-lines))
     ("'y" . ("copy" . dired-do-copy))
     ("'r" . ("rename" . dired-do-rename))
@@ -106,7 +109,7 @@
 (modaled-enable-substate-on-state-change
   "dired"
   :states '("normal" "select")
-  :major '(dired-mode wdired-mode))
+  :major '(dired-mode wdired-mode dired-sidebar-mode))
 
 (defun dired-highlight ()
   "Highlight line for Dired."
