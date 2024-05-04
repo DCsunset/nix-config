@@ -1010,8 +1010,6 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-\\") . ("eval region" . ,(hx :eval (hx-region-apply #'eval-region))))
     ("q" . ("quit window" . quit-window))
     ("Q" . ("kill buffer" . kill-this-buffer))
-    ;; disable return key and backspace key
-    ((,(kbd "RET") ,(kbd "DEL")) . ignore)
     ;; major-mode specific command
     ("'x" . ,(hx :region :let (command (lookup-key (current-local-map) (kbd "C-c C-c")))
                :eval (when command (call-interactively command))))))
@@ -1084,6 +1082,9 @@ Should be called only before entering multiple-cursors-mode."
     ;; only works in GUI as C-= and C-- are managed by terminal emulator otherwise
     (,(kbd "C-=") . ("scale increase" . text-scale-increase))
     (,(kbd "C--") . ("scale decrease" . text-scale-decrease))
+    ;; use global keybindings for return and backspace key only in insert mode
+    (,(kbd "RET") . ,(hx :eval (when (equal modaled-state "insert") (call-interactively #'newline))))
+    (,(kbd "DEL") . ,(hx :eval (when (equal modaled-state "insert") (call-interactively #'backward-delete-char-untabify))))
     ;; unset C-u for it to be used in vterm
     ((,(kbd "C-u")
       ,(kbd "C-d")
