@@ -160,34 +160,38 @@ module.exports = {
 		// space mode
 		" ": {
 			// yank to clipboard
-			y: [
-				{
-					command: "modalEditor.yank",
-					args: {
-						register: ""
-					}
-				},
-				"modalEditor.setNormalMode"
-			],
-			// paste from clipbard
+			c: {
+        y: [
+          {
+            command: "modalEditor.yank",
+            args: {
+              register: ""
+            }
+          },
+          "modalEditor.setNormalMode"
+        ],
+        // paste from clipbard
+        p: {
+          command: "modalEditor.paste",
+          args: {
+            register: ""
+          }
+        },
+        P: {
+          command: "modalEditor.paste",
+          args: {
+            register: "",
+            before: true
+          }
+        },
+      },
 			p: {
-				command: "modalEditor.paste",
-				args: {
-					register: ""
-				}
-			},
-			P: {
-				command: "modalEditor.paste",
-				args: {
-					register: "",
-					before: true
-				}
-			},
-			f: "workbench.action.quickOpen",
+        f: "workbench.action.quickOpen",
+        s: "workbench.action.findInFiles"
+      },
 			b: "workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup",
 			k: "editor.action.showHover",
-			"?": "workbench.action.showCommands",
-      C: "removeSecondaryCursors"
+			"?": "workbench.action.showCommands"
 		},
 
 		// search
@@ -219,12 +223,12 @@ module.exports = {
 			}
 		],
 
-		// Unimpaired
-		"[": {
-			d: "editor.action.marker.prev",
-		},
-		"]": {
-			d: "editor.action.marker.next",
+		// structural movement
+		s: {
+			e: {
+        j: "editor.action.marker.prev",
+        ";": "editor.action.marker.next"
+      },
 		},
 	},
 

@@ -74,7 +74,7 @@ with lib; {
     keybindings = [
       {
         key = "shift+alt+c";
-        command = "editor.action.insertCursorAbove";
+        command = "removeSecondaryCursors";
       }
       {
         key = "alt+[";
@@ -138,11 +138,11 @@ with lib; {
 
       # vscode-modal-editor
       {
-        key = "ctrl+u";
+        key = "ctrl+l";
         command = "modalEditor.halfPageUp";
       }
       {
-        key = "ctrl+d";
+        key = "ctrl+k";
         command = "modalEditor.halfPageDown";
       }
       {
