@@ -985,20 +985,20 @@ Should be called only before entering multiple-cursors-mode."
     ("`sl" . ("sort lines" . ,(hx :arg (b "Ascending?") :save :eval (hx-region-apply (-partial #'sort-lines (not arg))))))
     ("`sc" . ("sort columns" . ,(hx :arg (b "Ascending?") :save :eval (hx-region-apply (-partial #'sort-columns (not arg))))))
     ;; structural moving/editing
-    ("sj" . ("prev" . hx-struct-prev))
-    ("s;" . ("next" . hx-struct-next))
-    ("ssj" . ("backward" . hx-struct-backward))
-    ("ss;" . ("forward" . hx-struct-forward))
-    ("sl" . ("up in hierarchy (TS)" . hx-struct-up))
-    ("sk" . ("down into hierarchy (TS)" . hx-struct-down))
-    ("sdj" . ("drag backward in sibling (TS)" . hx-struct-drag-backward))
-    ("sd;" . ("drag forward in sibling (TS)" . hx-struct-drag-forward))
-    ("sdl" . ("drag up in hierarchy (TS)" . hx-struct-drag-up))
-    ("sdk" . ("drag down in hierarchy (TS)" . hx-struct-drag-down))
-    ("sW" . ("wrap struct (TS)" . hx-struct-wrap))
-    ("sD" . ("delete struct (TS)" . hx-struct-delete))
-    ("sej" . ("prev error" . ,(hx :eval (flymake-goto-prev-error nil '(:error :warning) t))))
-    ("se;" . ("next error" . ,(hx :eval (flymake-goto-next-error nil '(:error :warning) t))))
+    ("sj" . ("prev" . ,(hx :rec m :eval hx-struct-prev)))
+    ("s;" . ("next" . ,(hx :rec m :eval hx-struct-next)))
+    ("ssj" . ("backward" . ,(hx :rec m :eval hx-struct-backward)))
+    ("ss;" . ("forward" . ,(hx :rec m :eval hx-struct-forward)))
+    ("sl" . ("up in hierarchy (TS)" . ,(hx :rec m :eval hx-struct-up)))
+    ("sk" . ("down into hierarchy (TS)" . ,(hx :rec m :eval hx-struct-down)))
+    ("sej" . ("prev error" . ,(hx :rec m :eval (flymake-goto-prev-error nil '(:error :warning) t))))
+    ("se;" . ("next error" . ,(hx :rec m :eval (flymake-goto-next-error nil '(:error :warning) t))))
+    ("sdj" . ("drag backward in sibling (TS)" . ,(hx :rec c :eval hx-struct-drag-backward)))
+    ("sd;" . ("drag forward in sibling (TS)" . ,(hx :rec c :eval hx-struct-drag-forward)))
+    ("sdl" . ("drag up in hierarchy (TS)" . ,(hx :rec c :eval hx-struct-drag-up)))
+    ("sdk" . ("drag down in hierarchy (TS)" . ,(hx :rec c :eval hx-struct-drag-down)))
+    ("sW" . ("wrap struct (TS)" . ,(hx :rec c :eval hx-struct-wrap)))
+    ("sD" . ("delete struct (TS)" . ,(hx :rec c :eval hx-struct-delete)))
     ;; misc
     ("." . ("repeat change" . ,(hx :eval (hx-run-command-record 'c))))
     (,(kbd "M-.") . ("repeat motion" . ,(hx :eval (hx-run-command-record 'm))))
@@ -1085,9 +1085,10 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "C-=") . ("scale increase" . text-scale-increase))
     (,(kbd "C--") . ("scale decrease" . text-scale-decrease))
     ;; unset C-u for it to be used in vterm
-    (,(kbd "C-u") . nil)
-    ;; unset it to prevent conflict with M-<mouse-1>
-    (,(kbd "M-<down-mouse-1>") . nil)))
+    ((,(kbd "C-u")
+      ,(kbd "C-d")
+      ;; unset it to prevent conflict with M-<mouse-1>
+      ,(kbd "M-<down-mouse-1>")) . nil)))
 
 (setq modaled-init-state-fn
       (lambda ()
