@@ -955,6 +955,8 @@ Should be called only before entering multiple-cursors-mode."
     (" dF" . ("find file in dir (recursive)" . consult-fd))
     (" ds" . ("search in dir" . consult-ripgrep))
     (" dt" . ("dired tree" . dired-sidebar-toggle-sidebar))
+    (" dnf" . ("new file" . dired-create-empty-file))
+    (" dnd" . ("new dir" . dired-create-directory))
     (" b" . ("switch to buffer" . consult-buffer))
     (" ?" . ("search symbol" . apropos))
     (" k" . ("show eldoc" . hx-show-eldoc))
