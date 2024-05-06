@@ -2,7 +2,7 @@
 
 ;;; editor config
 ;; Use setq-default because many variables are buffer-local
-(setq-default major-mode 'org-mode  ; use org-mode by default instead of fundamental-mode
+(setq-default major-mode 'text-mode  ; use text-mode by default instead of fundamental-mode
               indent-tabs-mode nil  ; use spaces for indentation
               standard-indent 2
               tab-width 2

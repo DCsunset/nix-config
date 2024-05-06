@@ -63,6 +63,8 @@
                       (,electric-pair-inhibit-predicate c))))))
   :custom
   (org-babel-python-mode 'python-ts-mode)
+  ;; don't truncate lines (wrap lines instead)
+  (org-startup-truncated nil)
   :custom-face
   (org-headline-todo ((t (:foreground "#66acda"))))
   (org-headline-done ((t (:foreground "dark gray"))))

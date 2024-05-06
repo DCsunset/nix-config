@@ -871,8 +871,10 @@ Should be called only before entering multiple-cursors-mode."
   ;; movement
   `(("j" . ("left" . ,(hx :re-sel :eval backward-char)))
     (";" . ("right" . ,(hx :re-sel :eval forward-char)))
-    ("l" . ("up" . ,(hx :re-sel :eval previous-line)))
-    ("k" . ("down" . ,(hx :re-sel :eval next-line)))
+    ("l" . ("up (visual line)" . ,(hx :re-sel :eval previous-line)))
+    ("k" . ("down (visual line)" . ,(hx :re-sel :eval next-line)))
+    ("L" . ("up (text line)" . ,(hx :let (line-move-visual nil) :re-sel :eval previous-line)))
+    ("K" . ("down (text line)" . ,(hx :let (line-move-visual nil) :re-sel :eval next-line)))
     (,(kbd "C-j") . ("left 10x" . ,(hx :arg-desc "p" :re-sel :eval
                                        (funcall-interactively #'backward-char (* (car l-args) 10)))))
     (,(kbd "C-;") . ("right 10x" . ,(hx :arg-desc "p" :re-sel :eval
@@ -1084,9 +1086,6 @@ Should be called only before entering multiple-cursors-mode."
     ;; only works in GUI as C-= and C-- are managed by terminal emulator otherwise
     (,(kbd "C-=") . ("scale increase" . text-scale-increase))
     (,(kbd "C--") . ("scale decrease" . text-scale-decrease))
-    ;; use global keybindings for return and backspace key only in insert mode
-    (,(kbd "RET") . ,(hx :eval (when (equal modaled-state "insert") (call-interactively #'newline))))
-    (,(kbd "DEL") . ,(hx :eval (when (equal modaled-state "insert") (call-interactively #'backward-delete-char-untabify))))
     ;; unset C-u for it to be used in vterm
     ((,(kbd "C-u")
       ,(kbd "C-d")
