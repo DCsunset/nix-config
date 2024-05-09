@@ -165,7 +165,8 @@
   (company-dabbrev-downcase nil)
   (company-dabbrev-ignore-case nil)
   ;; cycle candidates' selection
-  (company-selection-wrap-around t))
+  (company-selection-wrap-around t)
+  (company-transforms '(company-sort-prefer-same-case-prefix)))
 
 ;; Manage popup window
 (use-package popwin

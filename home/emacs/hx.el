@@ -208,7 +208,14 @@ Toggle it when ARG is nil or 0."
          (delete-region (point)
                         (line-end-position)))))
 
-;; Command records
+(defun hx-no-sel ()
+  "Clear selection and disable highlight for it."
+  (interactive)
+  (hx-unhighlight)
+  (hx-set-mark nil))
+
+
+;;; Command records
 ;; Used register (symbol):
 ;; - m: motion
 ;; - c: change
@@ -254,11 +261,49 @@ Toggle it when ARG is nil or 0."
       (setq hx--recording-command nil))))
 
 
-(defun hx-no-sel ()
-  "Clear selection and disable highlight for it."
+;;; Jump list
+(defvar hx--jump-list nil
+  "Jump list to quickly jump between positions.")
+(defvar hx--jump-list-pos 0
+  "Current index in the jump list.")
+
+(defun hx-goto-marker (marker)
+  "Go to MARKER (possibly in another buffer."
+  (switch-to-buffer (marker-buffer marker))
+  (goto-char marker))
+
+(defun hx-jump-forward ()
+  "Jump forward (newer) in the jump list."
   (interactive)
-  (hx-unhighlight)
-  (hx-set-mark nil))
+  (when (<= hx--jump-list-pos 0)
+    (error (message "At the newest of jump list")))
+  (setq hx--jump-list-pos (1- hx--jump-list-pos))
+  (hx-goto-marker (nth hx--jump-list-pos hx--jump-list)))
+
+(defun hx-jump-backward ()
+  "Jump backward (older) in the jump list."
+  (interactive)
+  (when (>= hx--jump-list-pos (1- (length hx--jump-list)))
+    (error (message "At the oldest of jump list")))
+  (setq hx--jump-list-pos (1+ hx--jump-list-pos))
+  (hx-goto-marker (nth hx--jump-list-pos hx--jump-list)))
+
+(defun hx-jump-save ()
+  "Save current pos to jump list."
+  (interactive)
+  ;; fork from current pos
+  (dotimes (_ hx--jump-list-pos)
+    (pop hx--jump-list))
+  (setq hx--jump-list-pos 0)
+  (let ((marker (copy-marker (point))))
+    (setq hx--jump-list (-remove-item marker hx--jump-list))
+    (push marker hx--jump-list)))
+
+(defun hx-jump-select ()
+  "Select and go to a pos in jump list."
+  (interactive)
+  (let ((marker (consult-global-mark hx--jump-list)))
+    (setq hx--jump-list-pos (-elem-index marker hx--jump-list))))
 
 (defmacro hx (&rest args)
   "Construct an interactive lambda function based on ARGS.
@@ -273,6 +318,7 @@ The following options are available:
                - (s ARGS): Call `read-from-minibuffer' with args
                - (b ARGS): Call `y-or-n-p' with args
                - (B ARGS): Call `yes-or-no-p' with args
+:jump          Save pos before and after the command to jump list
 :rec REGS      Record this command in registers
 :save          Save and restore hx state after the command (point, mark, ...)
 :let ARGS      Bind variables in `let' macro using pairs.
@@ -304,6 +350,12 @@ The following options are available:
                                    f
                                  `(call-interactively #',f)))
                              (plist-get opts :eval)))
+         (jump-wrapper (lambda (f)
+                         (if (not (plist-member opts :jump)) f
+                           `(progn
+                              (hx-jump-save)
+                              ,f
+                              (hx-jump-save)))))
          (save-wrapper (lambda (f)
                          (if (not (plist-member opts :save)) f
                            `(let ((cur (point))
@@ -357,7 +409,8 @@ The following options are available:
                                      nil))))
          (let ,let-bindings
            ,(funcall
-             (-compose save-wrapper
+             (-compose jump-wrapper
+                       save-wrapper
                        region-wrapper
                        re-hl-wrapper
                        re-sel-wrapper)
@@ -901,7 +954,7 @@ Should be called only before entering multiple-cursors-mode."
     ("gp" . ("prev buffer" . centaur-tabs-backward))
     ("gN" . ("next buffer" . centaur-tabs-forward-group))
     ("gP" . ("prev buffer" . centaur-tabs-backward-group))
-    ("gd" . ("go to def" . ,(hx :let (xref-prompt-for-identifier nil) :eval xref-find-definitions)))
+    ("gd" . ("go to def" . ,(hx :jump :let (xref-prompt-for-identifier nil) :eval xref-find-definitions)))
     ;; match mode
     ("mm" . ("match any char" . ,(hx :rec m :re-sel :eval hx-match-char)))
     ("mb" . ("match bracket" . ,(hx :rec m :re-sel :eval (hx-match-char 'bracket))))
@@ -913,8 +966,6 @@ Should be called only before entering multiple-cursors-mode."
     ("ma" . ("surround with pair" . ,(hx :rec c :arg (c "Surround: ") :re-hl :eval modaled-set-main-state (hx-match-add arg))))
     ("mrc" . ("replace surrounding char" . ,(hx :rec c :arg (c "Surround replace: ") :re-hl :eval modaled-set-main-state (hx-match-replace arg))))
     ("mrt" . ("rename jsx tag" . ,(hx :re-hl :eval modaled-set-main-state jtsx-rename-jsx-element)))
-    (,(kbd "M-[") . ("jump forward" . xref-go-forward))
-    (,(kbd "M-]") . ("jump backward" . xref-go-back))
     ;; changes
     ("i" . ("insert before" . ,(hx :eval hx-no-sel (modaled-set-state "insert"))))
     ("a" . ("insert after" . ,(hx :eval hx-no-sel (modaled-set-state "insert") forward-char)))
@@ -963,6 +1014,7 @@ Should be called only before entering multiple-cursors-mode."
     (" ?" . ("search symbol" . apropos))
     (" k" . ("show eldoc" . hx-show-eldoc))
     (" r" . ("reload buffer" . revert-buffer))
+    (" j" . ("jump to" . hx-jump-select))
     ;; gtd
     (" tl" . ("gtd list" . org-todo-list))
     (" ti" . ("gtd inbox" . ,(hx :eval (find-file (gtd-file "inbox.org")))))
@@ -1071,6 +1123,9 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-;") . ("right window" . windmove-right))
     (,(kbd "M-l") . ("up window" . windmove-up))
     (,(kbd "M-k") . ("down window" . windmove-down))
+    (,(kbd "M-[") . ("jump backward" . hx-jump-backward))
+    (,(kbd "M-]") . ("jump forward" . hx-jump-forward))
+    (,(kbd "M-s") . ("save to jump list" . hx-jump-save))
     (,(kbd "C-M-j") . ("shrink window horizontally" . shrink-window-horizontally))
     (,(kbd "C-M-;") . ("enlarge window horizontally" . enlarge-window-horizontally))
     (,(kbd "C-M-l") . ("enlarge window vertically" . enlarge-window))
