@@ -266,6 +266,8 @@ Toggle it when ARG is nil or 0."
   "Jump list to quickly jump between positions.")
 (defvar hx--jump-list-pos 0
   "Current index in the jump list.")
+(defvar hx--jump-list-max-len 20
+  "Max length of jump list.")
 
 (defun hx-goto-marker (marker)
   "Go to MARKER (possibly in another buffer."
@@ -297,7 +299,27 @@ Toggle it when ARG is nil or 0."
   (setq hx--jump-list-pos 0)
   (let ((marker (copy-marker (point))))
     (setq hx--jump-list (-remove-item marker hx--jump-list))
-    (push marker hx--jump-list)))
+    (push marker hx--jump-list)
+    (when (> (length hx--jump-list) hx--jump-list-max-len)
+      (nbutlast hx--jump-list)))
+  (message "Saved to jump list"))
+
+(defun hx-jump-remove ()
+  "Remove current pos to jump list."
+  (interactive)
+  (if (not hx--jump-list)
+      (message "Jump list is empty")
+    (setq hx--jump-list (-remove-at hx--jump-list-pos hx--jump-list))
+    (when (> hx--jump-list-pos 0)
+      (setq hx--jump-list-pos (1- hx--jump-list-pos)))
+    (message "Removed from jump list")))
+
+(defun hx-jump-clear ()
+  "Clear jump list."
+  (interactive)
+  (setq hx--jump-list nil
+        hx--jump-list-pos 0)
+  (message "Cleared jump list"))
 
 (defun hx-jump-select ()
   "Select and go to a pos in jump list."
@@ -1014,7 +1036,8 @@ Should be called only before entering multiple-cursors-mode."
     (" ?" . ("search symbol" . apropos))
     (" k" . ("show eldoc" . hx-show-eldoc))
     (" r" . ("reload buffer" . revert-buffer))
-    (" j" . ("jump to" . hx-jump-select))
+    (" js" . ("select from jump list" . hx-jump-select))
+    (" jc" . ("clear jump list" . hx-jump-clear))
     ;; gtd
     (" tl" . ("gtd list" . org-todo-list))
     (" ti" . ("gtd inbox" . ,(hx :eval (find-file (gtd-file "inbox.org")))))
@@ -1126,6 +1149,7 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-[") . ("jump backward" . hx-jump-backward))
     (,(kbd "M-]") . ("jump forward" . hx-jump-forward))
     (,(kbd "M-s") . ("save to jump list" . hx-jump-save))
+    (,(kbd "M-S") . ("remove from jump list" . hx-jump-remove))
     (,(kbd "C-M-j") . ("shrink window horizontally" . shrink-window-horizontally))
     (,(kbd "C-M-;") . ("enlarge window horizontally" . enlarge-window-horizontally))
     (,(kbd "C-M-l") . ("enlarge window vertically" . enlarge-window))
