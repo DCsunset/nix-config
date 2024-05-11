@@ -530,6 +530,11 @@ Set mark when MARKING is t."
   (interactive)
   (delete-region (point) (progn (hx-previous-word) (point))))
 
+(defun hx-delete-line ()
+  "Delete content of current line but keep the line itself."
+  (interactive)
+  (delete-region (line-beginning-position) (line-end-position)))
+
 (defun hx-extend-to-line-bounds ()
   "Extend selection to line bounds."
   (interactive)
@@ -1096,11 +1101,17 @@ Should be called only before entering multiple-cursors-mode."
 (modaled-define-keys
   :states '("insert")
   :bind
-  `((,(kbd "C-w") . ("delete word backward" . hx-delete-word-backward))
-    (,(kbd "M-i") . ("code suggestion (LSP)" . company-manual-begin))
+  `((,(kbd "M-i") . ("code suggestion (LSP)" . company-manual-begin))
     ;; set tempo-match-finder temporarily to prevent conflicts
-    (,(kbd "M-t") . ("tempo complete" . ,(hx :let (tempo-match-finder my-tempo-match-finder) :eval tempo-complete-tag)))
-    ;; this makes pasting work in GUI
+    (,(kbd "M-t") . ("tempo complete" . ,(hx :let (tempo-match-finder my-tempo-match-finder) :eval tempo-complete-tag)))))
+
+(modaled-define-keys
+  :states '("insert")
+  :keymaps '(minibuffer-mode-map)
+  :bind
+  ;; this makes pasting work in GUI
+  `((,(kbd "C-w") . ("delete word backward" . hx-delete-word-backward))
+    (,(kbd "C-u") . ("delete line" . hx-delete-line))
     (,(kbd "C-S-v") . ("paste from clipboard" . ,(hx :eval (insert (xclip-get-selection 'clipboard)))))))
 
 (defun hx-save ()
@@ -1165,9 +1176,7 @@ Should be called only before entering multiple-cursors-mode."
     ;; only works in GUI as C-= and C-- are managed by terminal emulator otherwise
     (,(kbd "C-=") . ("scale increase" . text-scale-increase))
     (,(kbd "C--") . ("scale decrease" . text-scale-decrease))
-    ;; unset C-u for it to be used in vterm
-    ((,(kbd "C-u")
-      ,(kbd "C-d")
+    ((,(kbd "C-d")
       ;; unset it to prevent conflict with M-<mouse-1>
       ,(kbd "M-<down-mouse-1>")) . nil)))
 

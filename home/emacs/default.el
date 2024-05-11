@@ -216,6 +216,7 @@
     ("A" . ("stage all" . magit-stage-modified))
     ("u" . ("unstage" . magit-unstage))
     ("U" . ("unstage all" . magit-unstage-all))
+    ("z" . ("stash" . magit-stash))
     ("P" . ("push changes" . magit-push))
     ("F" . ("pull changes" . magit-pull))
     ("d" . ("diff" . magit-diff))
