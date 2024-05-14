@@ -24,6 +24,8 @@ rec {
   # list paths of all subdirectories in a dir
   listSubdirPaths = dir: map (x: dir + "/${x}") (listSubdirNames dir);
 
+  recursiveMergeAttrs = attrs: foldl' (acc: attr: recursiveUpdate acc attr) {} attrs;
+
   # import all modules in subdirs
   importSubdirs = dir: map import (listSubdirPaths dir);
 

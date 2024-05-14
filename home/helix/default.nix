@@ -1,3 +1,6 @@
+{ lib, mylib, ... }:
+
+with lib;
 {
   programs.helix = {
     enable = true;
@@ -5,56 +8,107 @@
     # config.toml
     settings = {
       theme = "dark_plus";
-      editor.cursor-shape.insert = "bar";
-      keys = {
-        normal = {
-          # remap direction keys
-          j = "move_char_left";
-          k = "move_line_down";
-          l = "move_line_up";
-          ";" = "move_char_right";
-          h = "collapse_selection";
-
-          A-left = "jump_backward";
-          A-right = "jump_forward";
-
+      editor = {
+        cursor-shape.insert = "bar";
+        soft-wrap.enable = true;
+      };
+      keys = let
+        commonKeys = {
+          C-s = ":w";
+          C-q = ":q";
+        };
+        nonInsertKeys = {
           # goto mode
           g = {
             j = "goto_line_start";
-            k = "goto_last_line";
-            l = "goto_file_start";
             ";" = "goto_line_end";
-            h = "no_op";
           };
 
-          # View mode
-          z = {
-            k = "scroll_down";
-            l = "scroll_up";
+          # space mode
+          space = {
+            c = {
+              y = "yank_to_clipboard";
+              p = "paste_clipboard_after";
+              P = "paste_clipboard_before";
+            };
+            # lsp
+            l = {
+              r = "rename_symbol";
+              a = "code_action";
+            };
+            p = {
+              f = "file_picker";
+            };
+            d = {
+              f = "file_picker_in_current_directory";
+            };
+            r = ":reload";
           };
-        };
 
-        insert = {
-          A-i = "completion";
-        };
-
-        select = {
-          # remap direction keys
-          j = "extend_char_left";
-          k = "extend_line_down";
-          l = "extend_line_up";
-          ";" = "extend_char_right";
-          h = "collapse_selection";
-
-          # goto mode
-          g = {
-            j = "goto_line_start";
-            k = "goto_last_line";
-            l = "goto_file_start";
-            ";" = "goto_line_end";
-            h = "no_op";
+          # transformation
+          "`" = {
+            c = {
+              l = "switch_to_lowercase";
+              u = "switch_to_uppercase";
+            };
           };
+
+          # structural ops
+          s = {
+            e = {
+              ";" = "goto_next_diag";
+              j = "goto_prev_diag";
+            };
+          };
+
+          c = "change_selection_noyank";
+          d = "delete_selection_noyank";
+          Q = ":buffer-close";
+          "A-["= "jump_backward";
+          "A-]" = "jump_forward";
+          A-s = "save_selection";
         };
+      in {
+        normal = mylib.recursiveMergeAttrs [
+          commonKeys
+          nonInsertKeys
+          {
+            j = "move_char_left";
+            k = "move_visual_line_down";
+            l = "move_visual_line_up";
+            ";" = "move_char_right";
+            K = "move_line_down";
+            L = "move_line_up";
+            C-j = replicate 5 "move_char_left";
+            C-k = replicate 5 "move_visual_line_down";
+            C-l = replicate 5 "move_visual_line_up";
+            "C-;" = replicate 5 "move_char_right";
+          }
+        ];
+
+        select = mylib.recursiveMergeAttrs [
+          commonKeys
+          nonInsertKeys
+          {
+            j = "extend_char_left";
+            k = "extend_visual_line_down";
+            l = "extend_visual_line_up";
+            ";" = "extend_char_right";
+            K = "extend_line_down";
+            L = "extend_line_up";
+            C-j = replicate 5 "extend_char_left";
+            C-k = replicate 5 "extend_visual_line_down";
+            C-l = replicate 5 "extend_visual_line_up";
+            "C-;" = replicate 5 "extend_char_right";
+          }
+        ];
+
+        insert = mylib.recursiveMergeAttrs [
+          commonKeys
+          {
+            A-i = "completion";
+          }
+        ];
       };
     };
 
