@@ -336,7 +336,7 @@ The following options are available:
                Argument will be (&rest l-args).
 :arg DEF       Read argument for eval forms. Argument will be arg.
                The following definitions supported:
-               - (c ARGS): Call `read-char-from-minibuffer' with args
+               - (c ARGS): Call `read-char' with args
                - (s ARGS): Call `read-from-minibuffer' with args
                - (b ARGS): Call `y-or-n-p' with args
                - (B ARGS): Call `yes-or-no-p' with args
@@ -413,7 +413,7 @@ The following options are available:
        (let ((arg ,(when arg-def
                      `(or (bound-and-true-p hx-arg)
                           (apply #',(pcase (car arg-def)
-                                      ('c #'read-char-from-minibuffer)
+                                      ('c #'read-char)
                                       ('s #'read-from-minibuffer)
                                       ('b #'y-or-n-p)
                                       ('B #'yes-or-no-p)
@@ -994,12 +994,12 @@ Should be called only before entering multiple-cursors-mode."
     ("mrc" . ("replace surrounding char" . ,(hx :rec c :arg (c "Surround replace: ") :re-hl :eval modaled-set-main-state (hx-match-replace arg))))
     ("mrt" . ("rename jsx tag" . ,(hx :re-hl :eval modaled-set-main-state jtsx-rename-jsx-element)))
     ;; changes
-    ("i" . ("insert before" . ,(hx :eval hx-no-sel (modaled-set-state "insert"))))
-    ("a" . ("insert after" . ,(hx :eval hx-no-sel (modaled-set-state "insert") forward-char)))
-    ("I" . ("insert at start of line" . ,(hx :eval hx-no-sel (modaled-set-state "insert") back-to-indentation)))
-    ("A" . ("insert at end of line" . ,(hx :eval hx-no-sel (modaled-set-state "insert") end-of-line)))
-    ("o" . ("insert below" . ,(hx :eval hx-no-sel (modaled-set-state "insert") end-of-line newline-and-indent)))
-    ("O" . ("insert above" . ,(hx :eval hx-no-sel (modaled-set-state "insert") beginning-of-line newline-and-indent (forward-line -1) indent-according-to-mode)))
+    ("i" . ("insert before" . ,(hx :rec c :eval hx-no-sel (modaled-set-state "insert"))))
+    ("a" . ("insert after" . ,(hx :rec c :eval hx-no-sel (modaled-set-state "insert") forward-char)))
+    ("I" . ("insert at start of line" . ,(hx :rec c :eval hx-no-sel (modaled-set-state "insert") back-to-indentation)))
+    ("A" . ("insert at end of line" . ,(hx :rec c :eval hx-no-sel (modaled-set-state "insert") end-of-line)))
+    ("o" . ("insert below" . ,(hx :rec c :eval hx-no-sel (modaled-set-state "insert") end-of-line newline-and-indent)))
+    ("O" . ("insert above" . ,(hx :rec c :eval hx-no-sel (modaled-set-state "insert") beginning-of-line newline-and-indent (forward-line -1) indent-according-to-mode)))
     ("r" . ("replace" . ,(hx :rec c :arg (c "Replace: ") :eval modaled-set-main-state (hx-region-replace arg) hx-no-sel)))
     ("y" . ("copy" . ,(hx :eval modaled-set-main-state (hx-region-apply #'kill-ring-save))))
     ("d" . ("delete" . ,(hx :rec c :eval modaled-set-main-state (hx-region-apply #'delete-region) hx-no-sel)))
