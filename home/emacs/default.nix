@@ -6,6 +6,7 @@
     package = with pkgs; emacs29;
     # emacs packages
     extraPackages = epkgs: with epkgs; [
+      ellama
       consult
       openwith
       rg
@@ -92,6 +93,7 @@
       ./check.el
       ./org.el
       ./dir.el
+      ./ai.el
       ./default.el
     ];
   };
