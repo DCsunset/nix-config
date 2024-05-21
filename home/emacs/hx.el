@@ -255,10 +255,10 @@ Toggle it when ARG is nil or 0."
   (when hx--recording-command
     (let ((inhibit-message t)
           (message-log-max nil))
+      (setq hx--recording-command nil)
       (end-kbd-macro nil)
       (dolist (reg hx--recording-command)
-        (setcdr (alist-get reg hx--command-records) last-kbd-macro))
-      (setq hx--recording-command nil))))
+        (setcdr (alist-get reg hx--command-records) last-kbd-macro)))))
 
 
 ;;; Jump list
@@ -1100,6 +1100,10 @@ Should be called only before entering multiple-cursors-mode."
     ("sW" . ("wrap struct (TS)" . ,(hx :rec c :eval hx-struct-wrap)))
     ("sD" . ("delete struct (TS)" . ,(hx :rec c :eval hx-struct-delete)))
     ;; misc
+    (,(kbd "M-[") . ("jump backward" . hx-jump-backward))
+    (,(kbd "M-]") . ("jump forward" . hx-jump-forward))
+    (,(kbd "M-s") . ("save to jump list" . hx-jump-save))
+    (,(kbd "M-S") . ("remove from jump list" . hx-jump-remove))
     ("." . ("repeat change" . ,(hx :eval (hx-run-command-record 'c))))
     (,(kbd "M-.") . ("repeat motion" . ,(hx :eval (hx-run-command-record 'm))))
     ;; note: TAB is the same as C-i in terminal
@@ -1128,7 +1132,9 @@ Should be called only before entering multiple-cursors-mode."
   ;; this makes pasting work in GUI
   `((,(kbd "C-w") . ("delete word backward" . hx-delete-word-backward))
     (,(kbd "C-u") . ("delete line" . hx-delete-line))
-    (,(kbd "C-S-v") . ("paste from clipboard" . ,(hx :eval (insert (xclip-get-selection 'clipboard)))))))
+    ;; In terminal C-S-v is <xterm-paste>
+    ;; Note: C-S-v conflicts with M-[ in terminal
+    ((,(kbd "C-S-v") [xterm-paste]) . ("paste from clipboard" . ,(hx :eval (insert (xclip-get-selection 'clipboard)))))))
 
 (defun hx-save ()
   "Save buffer or finish editing."
@@ -1162,7 +1168,7 @@ Should be called only before entering multiple-cursors-mode."
 
 ;; common keybindings for all states
 (modaled-define-keys
-  :states '("major" "normal" "select" "insert")
+  :states '("normal" "select" "insert")
   :bind
   `(([escape] . ("main state" . ,(hx :eval (hx--end-recording-command) modaled-set-main-state hx-format-blank-line hx-no-sel)))
     (,(kbd "M-SPC") . ("toggle vterm" . vterm-toggle))
@@ -1173,10 +1179,6 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-;") . ("right window" . windmove-right))
     (,(kbd "M-l") . ("up window" . windmove-up))
     (,(kbd "M-k") . ("down window" . windmove-down))
-    (,(kbd "M-[") . ("jump backward" . hx-jump-backward))
-    (,(kbd "M-]") . ("jump forward" . hx-jump-forward))
-    (,(kbd "M-s") . ("save to jump list" . hx-jump-save))
-    (,(kbd "M-S") . ("remove from jump list" . hx-jump-remove))
     (,(kbd "C-M-j") . ("shrink window horizontally" . shrink-window-horizontally))
     (,(kbd "C-M-;") . ("enlarge window horizontally" . enlarge-window-horizontally))
     (,(kbd "C-M-l") . ("enlarge window vertically" . enlarge-window))

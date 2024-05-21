@@ -104,10 +104,11 @@
           ("ta" "gtd archives" entry
            (file ,(gtd-file "archives.org"))
            "* DONE %i%?")))
-  (setq org-todo-keywords '((sequence "TODO(t)" "WAITING(w)" "SOMEDAY(s)" "|" "DONE(d)" "CANCELLED(c)")))
+  (setq org-todo-keywords '((sequence "TODO(t)" "WAITING(w)" "SOMEDAY(s)" "DOING(D)" "|" "DONE(d)" "CANCELLED(c)")))
   (setq org-todo-keyword-faces
         '(("SOMEDAY" . "light sky blue")
           ("WAITING" . "violet")
+          ("DOING" . "sandy brown")
           ("DONE" . "dark gray")
           ("CANCELLED" . "dark gray")))
   ;; apply faces to todo/done headline
@@ -155,6 +156,7 @@ LOC can be `current' or `other'."
         '((:name "Inbox" :file-path "inbox\\.org\\'")
           (:todo "TODO")
           (:todo "WAITING")
+          (:todo "DOING")
           (:todo "SOMEDAY")))
   ;; disable the keymap on header
   (setq org-super-agenda-header-map (make-sparse-keymap)))
