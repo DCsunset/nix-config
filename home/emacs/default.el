@@ -281,3 +281,27 @@
                  ;;(dedicated . t) ;dedicated is supported in emacs27
                  (reusable-frames . visible)
                  (window-height . 0.3))))
+
+(use-package vundo
+  :commands vundo)
+
+(modaled-define-substate "vundo")
+(modaled-define-keys
+  :substates '("vundo")
+  :bind
+  `(("j" . ("backward" . vundo-backward))
+    (";" . ("forward" . vundo-forward))
+    ("k" . ("down" . vundo-next))
+    ("l" . ("up" . vundo-previous))
+    ("w" . ("next fork" . vundo-stem-root))
+    ("b" . ("previous fork". vundo-next-root))
+    ("g;" . ("end". vundo-stem-end))
+    ("m" . ("mark". vundo-diff-mark))
+    ("u" . ("unmark". vundo-diff-unmark))
+    ("d" . ("diff". vundo-diff))
+    ("q" . ("quit". vundo-quit))))
+(modaled-enable-substate-on-state-change
+  "vundo"
+  :states '("normal" "select")
+  :major '(vundo-mode))
+

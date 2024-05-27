@@ -232,15 +232,16 @@ Toggle it when ARG is nil or 0."
 
 (defun hx-run-command-record (reg)
   "Run command recorded in REG."
-  (when-let ((rec (alist-get reg hx--command-records)))
-    (setq hx--running-command-record t)
+  (when-let ((rec (alist-get reg hx--command-records))
+             (hx--running-command-record t))
     (pcase-let ((`((,fn ,current-prefix-arg ,args ,hx-arg) . ,macro) rec))
       (apply fn args)
-      (when macro
+      ;; fake cursors will auto repeat the commands when kbd macro is executed by the real cursor
+      (when (and macro
+                 (not mc--executing-command-for-fake-cursor))
         (execute-kbd-macro macro)
         ;; [escape] won't be recorded in macro
-        (call-interactively (key-binding [escape]))))
-    (setq hx--running-command-record nil)))
+        (call-interactively (key-binding [escape]))))))
 
 (defun hx--start-recording-command (regs)
   "Start recording command and store it in REGS."
@@ -255,10 +256,10 @@ Toggle it when ARG is nil or 0."
   (when hx--recording-command
     (let ((inhibit-message t)
           (message-log-max nil))
-      (setq hx--recording-command nil)
       (end-kbd-macro nil)
       (dolist (reg hx--recording-command)
-        (setcdr (alist-get reg hx--command-records) last-kbd-macro)))))
+        (setcdr (alist-get reg hx--command-records) last-kbd-macro))
+      (setq hx--recording-command nil))))
 
 
 ;;; Jump list
@@ -423,7 +424,8 @@ The following options are available:
              ;; get current function
              (this (nth 1 (backtrace-frame 1))))
          ;; record command and args (only when not running a record)
-         (unless hx--running-command-record
+         (unless (or mc--executing-command-for-fake-cursor
+                     hx--running-command-record)
            (dolist (reg ',rec-regs)
              (hx-set-command-record reg
                                     (cons
@@ -443,6 +445,7 @@ The following options are available:
                  (message "%s" (error-message-string err))))))
          ;; record all keys in insert state for this command
          (when (and ',rec-regs
+                    (not mc--executing-command-for-fake-cursor)
                     (not hx--running-command-record)
                     (equal modaled-state "insert"))
            (setq hx--recording-command t)
@@ -1009,7 +1012,7 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-P") . ("paste before from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") -1) hx-no-sel)))
     (,(kbd "M-p") . ("paste after from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") +1) hx-no-sel)))
     ("J" . ("join lines" . hx-join-lines))
-    ("u" . ("undo" . ,(hx :eval hx-no-sel undo)))
+    ("u" . ("undo" . ,(hx :eval hx-no-sel undo-only)))
     ("U" . ("redo" . ,(hx :eval hx-no-sel undo-redo)))
     (">" . ("indent" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-rigidly 2))))
     ("<" . ("unindent" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-rigidly -2))))
@@ -1041,6 +1044,7 @@ Should be called only before entering multiple-cursors-mode."
     (" br" . ("reload buffer" . revert-buffer))
     (" ?" . ("search symbol" . apropos))
     (" k" . ("show eldoc" . hx-show-eldoc))
+    (" u" . ("undo tree" . vundo))
     (" jg" . ("go to (jump list)" . hx-jump-goto))
     (" jc" . ("clear jump list" . hx-jump-clear))
     ;; gtd
