@@ -282,8 +282,10 @@
                  (reusable-frames . visible)
                  (window-height . 0.3))))
 
-(use-package vundo
-  :commands vundo)
+
+;; undo
+(use-package undo-fu)
+(use-package vundo)
 
 (modaled-define-substate "vundo")
 (modaled-define-keys

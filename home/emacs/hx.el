@@ -349,6 +349,7 @@ The following options are available:
 :re-hl         Re-highlight selection.
 :re-sel        Update selection based on modaled state.
                Re-highlight if in SELECT state or clear selection otherwise.
+:once          Run only once when there are multiple cursors
 :eval FORMS    Forms to evaluate in body."
   (let* ((opts
           ;; normalize options by partitioning args by : items
@@ -368,6 +369,8 @@ The following options are available:
          (lambda-args (if arg-desc '(&rest l-args) '()))
          (arg-def (car (plist-get opts :arg)))
          (let-bindings (or (plist-get opts :let) '()))
+         ;; plist-member returns the list instead of t
+         (once (and (plist-member opts :once) t))
          (eval-forms (mapcar (lambda (f)
                                (if (listp f)
                                    f
@@ -411,45 +414,47 @@ The following options are available:
                                 ,f)))))
     `(lambda ,lambda-args
        (interactive ,arg-desc)
-       (let ((arg ,(when arg-def
-                     `(or (bound-and-true-p hx-arg)
-                          (apply #',(pcase (car arg-def)
-                                      ('c #'read-char)
-                                      ('s #'read-from-minibuffer)
-                                      ('b #'y-or-n-p)
-                                      ('B #'yes-or-no-p)
-                                      (_ (error
-                                          (message "Invalid hx arg def: %s" arg-def))))
-                                 ',(cdr arg-def)))))
-             ;; get current function
-             (this (nth 1 (backtrace-frame 1))))
-         ;; record command and args (only when not running a record)
-         (unless (or mc--executing-command-for-fake-cursor
-                     hx--running-command-record)
-           (dolist (reg ',rec-regs)
-             (hx-set-command-record reg
-                                    (cons
-                                     (list this current-prefix-arg (when ,arg-desc l-args) arg)
-                                     nil))))
-         (let ,let-bindings
-           ,(funcall
-             (-compose jump-wrapper
-                       save-wrapper
-                       region-wrapper
-                       re-hl-wrapper
-                       re-sel-wrapper)
-             ;; need to catch error to let wrappers finish completely
-             `(condition-case err
-                  (progn ,@eval-forms)
-                (error
-                 (message "%s" (error-message-string err))))))
-         ;; record all keys in insert state for this command
-         (when (and ',rec-regs
-                    (not mc--executing-command-for-fake-cursor)
-                    (not hx--running-command-record)
-                    (equal modaled-state "insert"))
-           (setq hx--recording-command t)
-           (hx--start-recording-command ',rec-regs))))))
+       (unless (and ,once
+                    mc--executing-command-for-fake-cursor)
+         (let ((arg ,(when arg-def
+                       `(or (bound-and-true-p hx-arg)
+                            (apply #',(pcase (car arg-def)
+                                        ('c #'read-char)
+                                        ('s #'read-from-minibuffer)
+                                        ('b #'y-or-n-p)
+                                        ('B #'yes-or-no-p)
+                                        (_ (error
+                                            (message "Invalid hx arg def: %s" arg-def))))
+                                   ',(cdr arg-def)))))
+               ;; get current function
+               (this (nth 1 (backtrace-frame 1))))
+           ;; record command and args (only when not running a record)
+           (unless (or mc--executing-command-for-fake-cursor
+                       hx--running-command-record)
+             (dolist (reg ',rec-regs)
+               (hx-set-command-record reg
+                                      (cons
+                                       (list this current-prefix-arg (when ,arg-desc l-args) arg)
+                                       nil))))
+           (let ,let-bindings
+             ,(funcall
+               (-compose jump-wrapper
+                         save-wrapper
+                         region-wrapper
+                         re-hl-wrapper
+                         re-sel-wrapper)
+               ;; need to catch error to let wrappers finish completely
+               `(condition-case err
+                    (progn ,@eval-forms)
+                  (error
+                   (message "%s" (error-message-string err))))))
+           ;; record all keys in insert state for this command
+           (when (and ',rec-regs
+                      (not mc--executing-command-for-fake-cursor)
+                      (not hx--running-command-record)
+                      (equal modaled-state "insert"))
+             (setq hx--recording-command t)
+             (hx--start-recording-command ',rec-regs)))))))
 
 (defun hx-find-char (char direction offset &optional marking)
   "Find CHAR in DIRECTION and place the cursor with OFFSET from it.
@@ -954,10 +959,10 @@ Should be called only before entering multiple-cursors-mode."
   ;; movement
   `(("j" . ("left" . ,(hx :re-sel :eval backward-char)))
     (";" . ("right" . ,(hx :re-sel :eval forward-char)))
-    ("l" . ("up (visual line)" . ,(hx :re-sel :eval previous-line)))
-    ("k" . ("down (visual line)" . ,(hx :re-sel :eval next-line)))
-    ("L" . ("up (text line)" . ,(hx :let (line-move-visual nil) :re-sel :eval previous-line)))
-    ("K" . ("down (text line)" . ,(hx :let (line-move-visual nil) :re-sel :eval next-line)))
+    ("l" . ("up (visual)" . ,(hx :re-sel :eval previous-line)))
+    ("k" . ("down (visual)" . ,(hx :re-sel :eval next-line)))
+    ("L" . ("up (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval previous-line)))
+    ("K" . ("down (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval next-line)))
     (,(kbd "C-j") . ("left 10x" . ,(hx :arg-desc "p" :re-sel :eval
                                        (funcall-interactively #'backward-char (* (car l-args) 10)))))
     (,(kbd "C-;") . ("right 10x" . ,(hx :arg-desc "p" :re-sel :eval
@@ -978,8 +983,10 @@ Should be called only before entering multiple-cursors-mode."
     ("gl" . ("go to line interactively" . consult-goto-line))
     ("gs" . ("search and go to line" . consult-line))
     ("ge" . ("end of file" . ,(hx :re-sel :eval (goto-char (point-max)))))
-    ("gj" . ("start of line" . ,(hx :re-sel :eval beginning-of-line)))
-    ("g;" . ("end of line" . ,(hx :re-sel :eval end-of-line (re-search-backward ".\\|^"))))  ; move to last char if exists
+    ("gj" . ("start of line (visual)" . ,(hx :re-sel :eval beginning-of-visual-line)))
+    ("g;" . ("end of line (visual)" . ,(hx :re-sel :eval end-of-visual-line (re-search-backward ".\\|^"))))  ; move to last char if exists
+    ("gJ" . ("start of line (text)" . ,(hx :re-sel :eval beginning-of-line)))
+    ("g:" . ("end of line (text)" . ,(hx :re-sel :eval end-of-line (re-search-backward ".\\|^"))))  ; move to last char if exists
     ("gn" . ("next buffer" . centaur-tabs-forward))
     ("gp" . ("prev buffer" . centaur-tabs-backward))
     ("gN" . ("next buffer" . centaur-tabs-forward-group))
@@ -1012,8 +1019,9 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-P") . ("paste before from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") -1) hx-no-sel)))
     (,(kbd "M-p") . ("paste after from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") +1) hx-no-sel)))
     ("J" . ("join lines" . hx-join-lines))
-    ("u" . ("undo" . ,(hx :eval hx-no-sel undo-only)))
-    ("U" . ("redo" . ,(hx :eval hx-no-sel undo-redo)))
+    ("u" . ("undo" . ,(hx :once :eval hx-no-sel undo-fu-only-undo)))
+    ("U" . ("redo" . ,(hx :once :eval hx-no-sel undo-fu-only-redo)))
+    (,(kbd "M-U") . ("redo all" . ,(hx :once :eval hx-no-sel undo-fu-only-redo-all)))
     (">" . ("indent" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-rigidly 2))))
     ("<" . ("unindent" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-rigidly -2))))
     ("=" . ("format" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-region))))
