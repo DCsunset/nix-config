@@ -215,52 +215,71 @@ Toggle it when ARG is nil or 0."
   (hx-set-mark nil))
 
 
-;;; Command records
+;;; Command records (each register stores a ring of records)
 ;; Used register (symbol):
 ;; - m: motion
 ;; - c: change
 (modaled-define-local-var hx--command-records nil
   "Recorded commands.")
-(modaled-define-local-var hx--recording-command nil
-  "Whether it is recording macro for command into specific registers.")
+(modaled-define-local-var hx--recorded-keys nil
+  "Recorded keys in insert state.")
+(modaled-define-local-var hx--recording-regs nil
+  "Registers it is recording keys into.")
 (modaled-define-local-var hx--running-command-record nil
   "Whether it is running command record.")
 
-(defun hx-set-command-record (reg record)
+(defun hx--add-command-record (reg record)
   "Set command RECORD for REG register."
-  (setf (alist-get reg hx--command-records) record))
+  (let ((ring (or (alist-get reg hx--command-records)
+                  (make-ring 10))))
+    (ring-insert ring record)
+    (setf (alist-get reg hx--command-records) ring)))
 
-(defun hx-run-command-record (reg)
-  "Run command recorded in REG."
-  (when-let ((rec (alist-get reg hx--command-records))
-             (hx--running-command-record t))
-    (pcase-let ((`((,fn ,current-prefix-arg ,args ,hx-arg) . ,macro) rec))
-      (apply fn args)
-      ;; fake cursors will auto repeat the commands when kbd macro is executed by the real cursor
-      (when (and macro
-                 (not mc--executing-command-for-fake-cursor))
-        (execute-kbd-macro macro)
-        ;; [escape] won't be recorded in macro
-        (call-interactively (key-binding [escape]))))))
+(defun hx-run-command-record (reg &optional index)
+  "Run latest command record in REG."
+  (when-let* ((ring (alist-get reg hx--command-records))
+              (rec (ring-ref ring (or index 0)))
+              (hx--running-command-record t))
+    (pcase-let ((`(,keys ,hx-args) rec))
+      (execute-kbd-macro keys))))
 
-(defun hx--start-recording-command (regs)
-  "Start recording command and store it in REGS."
-  ;; discard messages
-  (let ((inhibit-message t)
-        (message-log-max nil))
-    (setq hx--recording-command regs)
-    (start-kbd-macro nil)))
+(defun hx-select-command-record (reg)
+  "Select command record in REG."
+  (when-let* ((ring (alist-get reg hx--command-records))
+              (rec-list (--map (format "%s   %s"
+                                       (key-description (car it))
+                                       (cadr it))
+                               (ring-elements ring)))
+              (rec-str (completing-read "Record to run: " rec-list nil t))
+              (rec-idx (-elem-index rec-str rec-list)))
+    (hx-run-command-record reg rec-idx)
+    ;; promote this record
+    (ring-insert ring (ring-remove ring rec-idx))))
 
-(defun hx--end-recording-command ()
-  "End recording command."
-  (when hx--recording-command
-    (let ((inhibit-message t)
-          (message-log-max nil))
-      (end-kbd-macro nil)
-      (dolist (reg hx--recording-command)
-        (setcdr (alist-get reg hx--command-records) last-kbd-macro))
-      (setq hx--recording-command nil))))
+(defun hx--record-keys-hook ()
+  "Record keys in insert state."
+  (when (and (equal modaled-state "insert")
+             (not mc--executing-command-for-fake-cursor)
+             (not hx--running-command-record))
+    ;; must use vector as some key sequences (e.g. [escape]) can't be represented by string
+    (setq hx--recorded-keys (vconcat hx--recorded-keys (this-command-keys-vector)))))
+(add-hook 'pre-command-hook #'hx--record-keys-hook)
 
+(defun hx--record-keys-watcher (_ new-val _ _)
+  "Watcher to finish recording keys when exiting insert state (NEW-VAL not insert)."
+  (when (and hx--recording-regs
+             (not mc--executing-command-for-fake-cursor)
+             (not hx--running-command-record)
+             (equal modaled-state "insert")
+             (not (equal new-val "insert")))
+    (dolist (reg hx--recording-regs)
+      (let ((rec (ring-ref (alist-get reg hx--command-records) 0)))
+        ;; append recorded keys to the command keys
+        (setcar rec
+                (vconcat (car rec) hx--recorded-keys))))
+    (setq hx--recording-regs nil
+          hx--recorded-keys nil)))
+(add-variable-watcher 'modaled-state #'hx--record-keys-watcher)
 
 ;;; Jump list
 (defvar hx--jump-list nil
@@ -416,26 +435,30 @@ The following options are available:
        (interactive ,arg-desc)
        (unless (and ,once
                     mc--executing-command-for-fake-cursor)
-         (let ((arg ,(when arg-def
-                       `(or (bound-and-true-p hx-arg)
-                            (apply #',(pcase (car arg-def)
-                                        ('c #'read-char)
-                                        ('s #'read-from-minibuffer)
-                                        ('b #'y-or-n-p)
-                                        ('B #'yes-or-no-p)
-                                        (_ (error
-                                            (message "Invalid hx arg def: %s" arg-def))))
-                                   ',(cdr arg-def)))))
-               ;; get current function
-               (this (nth 1 (backtrace-frame 1))))
+         ;; get current command keys before arg prompt to prevent recording those keys
+         (pcase-let* ((keys (this-command-keys-vector))
+                ;; hx-args used to run this command non-interactively
+                      (`(,arg ,l-args ,current-prefix-arg)
+                       (or (bound-and-true-p hx-args)
+                           (list
+                            ,(when arg-def
+                               `(apply #',(pcase (car arg-def)
+                                            ('c #'read-char)
+                                            ('s #'read-from-minibuffer)
+                                            ('b #'y-or-n-p)
+                                            ('B #'yes-or-no-p)
+                                            (_ (error
+                                                (message "Invalid hx arg def: %s" arg-def))))
+                                       ',(cdr arg-def)))
+                            ,(when arg-desc 'l-args)
+                            current-prefix-arg))))
            ;; record command and args (only when not running a record)
            (unless (or mc--executing-command-for-fake-cursor
                        hx--running-command-record)
              (dolist (reg ',rec-regs)
-               (hx-set-command-record reg
-                                      (cons
-                                       (list this current-prefix-arg (when ,arg-desc l-args) arg)
-                                       nil))))
+               (hx--add-command-record
+                reg
+                (list keys (list arg l-args current-prefix-arg)))))
            (let ,let-bindings
              ,(funcall
                (-compose jump-wrapper
@@ -449,12 +472,7 @@ The following options are available:
                   (error
                    (message "%s" (error-message-string err))))))
            ;; record all keys in insert state for this command
-           (when (and ',rec-regs
-                      (not mc--executing-command-for-fake-cursor)
-                      (not hx--running-command-record)
-                      (equal modaled-state "insert"))
-             (setq hx--recording-command t)
-             (hx--start-recording-command ',rec-regs)))))))
+           (setq hx--recording-regs ',rec-regs))))))
 
 (defun hx-find-char (char direction offset &optional marking)
   "Find CHAR in DIRECTION and place the cursor with OFFSET from it.
@@ -961,15 +979,15 @@ Should be called only before entering multiple-cursors-mode."
     (";" . ("right" . ,(hx :re-sel :eval forward-char)))
     ("l" . ("up (visual)" . ,(hx :re-sel :eval previous-line)))
     ("k" . ("down (visual)" . ,(hx :re-sel :eval next-line)))
-    ("L" . ("up (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval previous-line)))
-    ("K" . ("down (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval next-line)))
-    (,(kbd "C-j") . ("left 10x" . ,(hx :arg-desc "p" :re-sel :eval
+    (,(kbd "C-l") . ("up (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval previous-line)))
+    (,(kbd "C-k") . ("down (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval next-line)))
+    ("J" . ("left 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                        (funcall-interactively #'backward-char (* (car l-args) 10)))))
-    (,(kbd "C-;") . ("right 10x" . ,(hx :arg-desc "p" :re-sel :eval
+    (":" . ("right 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                         (funcall-interactively #'forward-char (* (car l-args) 10)))))
-    (,(kbd "C-l") . ("up 10x" . ,(hx :arg-desc "p" :re-sel :eval
+    ("L" . ("up 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                      (funcall-interactively #'previous-line (* (car l-args) 10)))))
-    (,(kbd "C-k") . ("down 10x" . ,(hx :arg-desc "p" :re-sel :eval
+    ("K" . ("down 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                        (funcall-interactively #'next-line (* (car l-args) 10)))))
     ("w" . ("next word" . ,(hx :re-hl :eval (hx-next-word (equal modaled-state "normal")))))
     ("b" . ("prev word" . ,(hx :re-hl :eval (hx-previous-word (equal modaled-state "normal")))))
@@ -1071,6 +1089,9 @@ Should be called only before entering multiple-cursors-mode."
     (" l=" . ("format (LSP)" . eglot-format-buffer))
     (" la" . ("action (LSP)" . eglot-code-actions))
     (" lf" . ("quickfix (LSP)" . eglot-code-action-quickfix))
+    ;; shell
+    (" sx" . ("shell command" . shell-command))
+    (" sr" . ("shell command on region (as input)" . ,(hx :region :eval shell-command-on-region)))
     ;; git
     (" go" . ("open magit" . magit-status))
     (" gd" . ("show diff" . vc-diff))
@@ -1117,13 +1138,13 @@ Should be called only before entering multiple-cursors-mode."
     (,(kbd "M-s") . ("save to jump list" . hx-jump-save))
     (,(kbd "M-S") . ("remove from jump list" . hx-jump-remove))
     ("." . ("repeat change" . ,(hx :eval (hx-run-command-record 'c))))
-    (,(kbd "M-.") . ("repeat motion" . ,(hx :eval (hx-run-command-record 'm))))
+    (,(kbd "M-.") . ("select change" . ,(hx :eval (hx-select-command-record 'c))))
+    ("," . ("repeat motion" . ,(hx :eval (hx-run-command-record 'm))))
+    (,(kbd "M-,") . ("select motion" . ,(hx :eval (hx-select-command-record 'm))))
     ;; note: TAB is the same as C-i in terminal
     ((,(kbd "TAB") ,(kbd "<tab>")) . ("toggle visibility" . hx-toggle-visibility))
-    (":" . ("run shell command" . shell-command))
-    ("|" . ("eval expr" . eval-expression))
-    ("\\" . ("eval region and print" . ,(hx :eval (hx-region-apply #'eval-region t))))
-    (,(kbd "M-\\") . ("eval region" . ,(hx :eval (hx-region-apply #'eval-region))))
+    ("|" . ("expr eval" . eval-expression))
+    ("\\" . ("eval region" . ,(hx :eval (hx-region-apply #'eval-region t))))
     ("q" . ("quit window" . quit-window))
     ("Q" . ("kill buffer" . kill-this-buffer))
     ;; major-mode specific command
@@ -1182,7 +1203,7 @@ Should be called only before entering multiple-cursors-mode."
 (modaled-define-keys
   :states '("normal" "select" "insert")
   :bind
-  `(([escape] . ("main state" . ,(hx :eval (hx--end-recording-command) modaled-set-main-state hx-format-blank-line hx-no-sel)))
+  `(([escape] . ("main state" . ,(hx :eval modaled-set-main-state hx-format-blank-line hx-no-sel)))
     (,(kbd "M-SPC") . ("toggle vterm" . vterm-toggle))
     (,(kbd "M-h") . ("split horizontally" . ,(hx :eval split-window-horizontally other-window)))
     (,(kbd "M-v") . ("split vertically" . ,(hx :eval split-window-vertically other-window)))

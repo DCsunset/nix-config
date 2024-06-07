@@ -104,10 +104,11 @@
           ("ta" "gtd archives" entry
            (file ,(gtd-file "archives.org"))
            "* DONE %i%?")))
-  (setq org-todo-keywords '((sequence "TODO(t)" "WAITING(w)" "SOMEDAY(s)" "DOING(D)" "|" "DONE(d)" "CANCELLED(c)")))
+  (setq org-todo-keywords '((sequence "TODO(t)" "WAITING(w)" "SOMEDAY(s)" "DOING(D)" "PLANNED(p)" "|" "DONE(d)" "CANCELLED(c)")))
   (setq org-todo-keyword-faces
         '(("SOMEDAY" . "light sky blue")
-          ("WAITING" . "violet")
+          ("PLANNED" . "RoyalBlue1")
+          ("WAITING" . "orchid")
           ("DOING" . "sandy brown")
           ("DONE" . "dark gray")
           ("CANCELLED" . "dark gray")))
@@ -157,7 +158,8 @@ LOC can be `current' or `other'."
           (:todo "TODO")
           (:todo "WAITING")
           (:todo "DOING")
-          (:todo "SOMEDAY")))
+          (:todo "SOMEDAY")
+          (:todo "PLANNED")))
   ;; disable the keymap on header
   (setq org-super-agenda-header-map (make-sparse-keymap)))
 

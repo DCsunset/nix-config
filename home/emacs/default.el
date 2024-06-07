@@ -38,8 +38,8 @@
         '(("TODO" . "red")
           ("FIXME" . "red")
           ("BUG" . "red")
-          ("WAITING" . "violet")
-          ("HACK" . "dark orange")))
+          ("WAITING" . "orchid")
+          ("HACK" . "sandy brown")))
   (global-hl-todo-mode))
 
 (use-package dashboard
@@ -166,7 +166,7 @@
   (company-dabbrev-ignore-case nil)
   ;; cycle candidates' selection
   (company-selection-wrap-around t)
-  (company-transforms '(company-sort-prefer-same-case-prefix)))
+  (company-transformers '(company-sort-prefer-same-case-prefix)))
 
 ;; Manage popup window
 (use-package popwin
