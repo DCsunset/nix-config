@@ -6,6 +6,7 @@
     package = with pkgs; emacs29;
     # emacs packages
     extraPackages = epkgs: with epkgs; [
+      pkgs.nur-dcsunset.emacsPackages.kkp
       undo-fu
       vundo
       ellama

@@ -39,6 +39,10 @@
 ;; don't use eval-when-compile to avoid bind-key errors
 (require 'use-package)
 
+(use-package kkp
+  :config
+  (global-kkp-mode +1))
+
 (use-package dash)
 
 (use-package nerd-icons

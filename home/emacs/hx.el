@@ -979,15 +979,15 @@ Should be called only before entering multiple-cursors-mode."
     (";" . ("right" . ,(hx :re-sel :eval forward-char)))
     ("l" . ("up (visual)" . ,(hx :re-sel :eval previous-line)))
     ("k" . ("down (visual)" . ,(hx :re-sel :eval next-line)))
-    (,(kbd "C-l") . ("up (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval previous-line)))
-    (,(kbd "C-k") . ("down (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval next-line)))
-    ("J" . ("left 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
+    ("L" . ("up (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval previous-line)))
+    ("K" . ("down (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval next-line)))
+    (,(kbd "C-j") . ("left 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                        (funcall-interactively #'backward-char (* (car l-args) 10)))))
-    (":" . ("right 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
+    (,(kbd "C-;") . ("right 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                         (funcall-interactively #'forward-char (* (car l-args) 10)))))
-    ("L" . ("up 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
+    (,(kbd "C-l") . ("up 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                      (funcall-interactively #'previous-line (* (car l-args) 10)))))
-    ("K" . ("down 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
+    (,(kbd "C-k") . ("down 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                        (funcall-interactively #'next-line (* (car l-args) 10)))))
     ("w" . ("next word" . ,(hx :re-hl :eval (hx-next-word (equal modaled-state "normal")))))
     ("b" . ("prev word" . ,(hx :re-hl :eval (hx-previous-word (equal modaled-state "normal")))))
@@ -1133,8 +1133,8 @@ Should be called only before entering multiple-cursors-mode."
     ("sW" . ("wrap struct (TS)" . ,(hx :rec c :eval hx-struct-wrap)))
     ("sD" . ("delete struct (TS)" . ,(hx :rec c :eval hx-struct-delete)))
     ;; misc
-    (,(kbd "M-[") . ("jump backward" . hx-jump-backward))
-    (,(kbd "M-]") . ("jump forward" . hx-jump-forward))
+    ("{" . ("jump backward" . hx-jump-backward))
+    ("}" . ("jump forward" . hx-jump-forward))
     (,(kbd "M-s") . ("save to jump list" . hx-jump-save))
     (,(kbd "M-S") . ("remove from jump list" . hx-jump-remove))
     ("." . ("repeat change" . ,(hx :eval (hx-run-command-record 'c))))
