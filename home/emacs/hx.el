@@ -240,7 +240,7 @@ Toggle it when ARG is nil or 0."
   (when-let* ((ring (alist-get reg hx--command-records))
               (rec (ring-ref ring (or index 0)))
               (hx--running-command-record t))
-    (pcase-let ((`(,keys ,hx-args) rec))
+    (pcase-let ((`(,keys ,hx--args) rec))
       (execute-kbd-macro keys))))
 
 (defun hx-select-command-record (reg)
@@ -347,6 +347,20 @@ Toggle it when ARG is nil or 0."
   (let ((marker (consult-global-mark hx--jump-list)))
     (setq hx--jump-list-pos (-elem-index marker hx--jump-list))))
 
+(modaled-define-local-var hx-arg-next nil
+  "Set hx-arg for next command.
+Use a different name from `hx-arg' to prevent shadowing and allow modifying next.")
+(modaled-define-local-var hx-arg-persist nil
+  "Do not clear hx-arg after running next command.")
+
+;; clear arg after next command
+(defun hx--clear-hx-arg-hook ()
+  (when hx-arg-next
+    (if hx-arg-persist
+        (setq hx-arg-persist nil)
+      (setq hx-arg-next nil))))
+(add-hook 'post-command-hook #'hx--clear-hx-arg-hook)
+
 (defmacro hx (&rest args)
   "Construct an interactive lambda function based on ARGS.
 
@@ -437,9 +451,9 @@ The following options are available:
                     mc--executing-command-for-fake-cursor)
          ;; get current command keys before arg prompt to prevent recording those keys
          (pcase-let* ((keys (this-command-keys-vector))
-                ;; hx-args used to run this command non-interactively
-                      (`(,arg ,l-args ,current-prefix-arg)
-                       (or (bound-and-true-p hx-args)
+                      ;; hx--args used to run this command non-interactively
+                      (`(,arg ,l-args ,current-prefix-arg ,hx-arg)
+                       (or (bound-and-true-p hx--args)
                            (list
                             ,(when arg-def
                                `(apply #',(pcase (car arg-def)
@@ -451,14 +465,15 @@ The following options are available:
                                                 (message "Invalid hx arg def: %s" arg-def))))
                                        ',(cdr arg-def)))
                             ,(when arg-desc 'l-args)
-                            current-prefix-arg))))
+                            current-prefix-arg
+                            hx-arg-next))))
            ;; record command and args (only when not running a record)
            (unless (or mc--executing-command-for-fake-cursor
                        hx--running-command-record)
              (dolist (reg ',rec-regs)
                (hx--add-command-record
                 reg
-                (list keys (list arg l-args current-prefix-arg)))))
+                (list keys (list arg l-args current-prefix-arg hx-arg)))))
            (let ,let-bindings
              ,(funcall
                (-compose jump-wrapper
@@ -1073,6 +1088,20 @@ Should be called only before entering multiple-cursors-mode."
     (" u" . ("undo tree" . vundo))
     (" jg" . ("go to (jump list)" . hx-jump-goto))
     (" jc" . ("clear jump list" . hx-jump-clear))
+    (" ep" . ("prev error" . ,(hx :rec m
+                                  :let (types (pcase hx-arg
+                                                ('f1 '(:error))
+                                                ('f2 '(:warning))
+                                                ('f3 '(:note))
+                                                (_ '(:error :warning))))
+                                  :eval (flymake-goto-prev-error nil types t))))
+    (" en" . ("next error" . ,(hx :rec m
+                                  :let (types (pcase hx-arg
+                                                ('f1 '(:error))
+                                                ('f2 '(:warning))
+                                                ('f3 '(:note))
+                                                (_ '(:error :warning))))
+                                  :eval (flymake-goto-next-error nil types t))))
     ;; gtd
     (" tl" . ("gtd list" . org-todo-list))
     (" ti" . ("gtd inbox" . ,(hx :eval (find-file (gtd-file "inbox.org")))))
@@ -1124,8 +1153,6 @@ Should be called only before entering multiple-cursors-mode."
     ("ss;" . ("forward" . ,(hx :rec m :eval hx-struct-forward)))
     ("sl" . ("up in hierarchy (TS)" . ,(hx :rec m :eval hx-struct-up)))
     ("sk" . ("down into hierarchy (TS)" . ,(hx :rec m :eval hx-struct-down)))
-    ("sej" . ("prev error" . ,(hx :rec m :eval (flymake-goto-prev-error nil '(:error :warning) t))))
-    ("se;" . ("next error" . ,(hx :rec m :eval (flymake-goto-next-error nil '(:error :warning) t))))
     ("sdj" . ("drag backward in sibling (TS)" . ,(hx :rec c :eval hx-struct-drag-backward)))
     ("sd;" . ("drag forward in sibling (TS)" . ,(hx :rec c :eval hx-struct-drag-forward)))
     ("sdl" . ("drag up in hierarchy (TS)" . ,(hx :rec c :eval hx-struct-drag-up)))
@@ -1147,6 +1174,23 @@ Should be called only before entering multiple-cursors-mode."
     ("\\" . ("eval region" . ,(hx :eval (hx-region-apply #'eval-region t))))
     ("q" . ("quit window" . quit-window))
     ("Q" . ("kill buffer" . kill-this-buffer))
+    ;; hx-arg
+    ([f1] . ("hx-arg f1" . ,(hx :eval
+                                (message "hx-arg: 'f1")
+                                (setq hx-arg-next 'f1
+                                      hx-arg-persist t))))
+    ([f2] . ("hx-arg f2" . ,(hx :eval
+                                (message "hx-arg: 'f2")
+                                (setq hx-arg-next 'f2
+                                      hx-arg-persist t))))
+    ([f3] . ("hx-arg f3" . ,(hx :eval
+                                (message "hx-arg: 'f3")
+                                (setq hx-arg-next 'f3
+                                      hx-arg-persist t))))
+    ([f4] . ("hx-arg f4" . ,(hx :eval
+                                (message "hx-arg: 'f4")
+                                (setq hx-arg-next 'f4
+                                      hx-arg-persist t))))
     ;; major-mode specific command
     ("'x" . ,(hx :region :let (command (lookup-key (current-local-map) (kbd "C-c C-c")))
                :eval (when command (call-interactively command))))))
