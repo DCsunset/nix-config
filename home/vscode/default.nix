@@ -15,7 +15,7 @@ with lib; {
       yzhang.markdown-all-in-one
       ms-python.python
       mechatroner.rainbow-csv
-      matklad.rust-analyzer
+      rust-lang.rust-analyzer
       gruntfuggly.todo-tree
       golang.go
     ];
