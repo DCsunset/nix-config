@@ -166,6 +166,7 @@
   (company-dabbrev-ignore-case nil)
   ;; cycle candidates' selection
   (company-selection-wrap-around t)
+  (company-require-match nil)
   (company-transformers '(company-sort-prefer-same-case-prefix)))
 
 ;; Manage popup window

@@ -76,6 +76,7 @@
     yaml-ts-mode
     dockerfile-ts-mode
     nix-mode
+    lua-mode
     latex-mode) . eglot-ensure)
   :init
   ; disable event buffer (hangs frequently in js/ts)

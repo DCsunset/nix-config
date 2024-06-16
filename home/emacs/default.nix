@@ -61,6 +61,7 @@
       xeft
       company
       nix-mode
+      lua-mode
       haskell-mode
       caddyfile-mode
       # tree-sitter for emacs 29+

@@ -378,7 +378,8 @@ The following options are available:
 :rec REGS      Record this command in registers
 :save          Save and restore hx state after the command (point, mark, ...)
 :let ARGS      Bind variables in `let' macro using pairs.
-:region        Set native region to `hx-region' for body forms.
+:region [ARG]  Set native region to `hx-region' for body forms.
+               If ARG is t, always enable the region (even when hx--mark unset).
 :re-hl         Re-highlight selection.
 :re-sel        Update selection based on modaled state.
                Re-highlight if in SELECT state or clear selection otherwise.
@@ -426,10 +427,14 @@ The following options are available:
                            (if (not (plist-member opts :region)) f
                              ;; transient-mark-mode must be true
                              ;; for region-active-p to be true
-                             `(let ((transient-mark-mode t))
-                                (set-mark hx--mark)
-                                ,f
-                                (set-mark nil)))))
+                             `(let ((transient-mark-mode t)
+                                    (region (hx-region)))
+                                  (save-mark-and-excursion
+                                    (when (or ,(and (plist-get opts :region) t)
+                                              hx--mark)
+                                      (goto-char (car region))
+                                      (set-mark (cdr region)))
+                                    ,f)))))
          (re-hl-wrapper (lambda (f)
                            (if (not (plist-member opts :re-hl)) f
                              `(progn
@@ -1030,6 +1035,7 @@ Should be called only before entering multiple-cursors-mode."
     ("mb" . ("match bracket" . ,(hx :rec m :re-sel :eval (hx-match-char 'bracket))))
     ("mq" . ("match quote" . ,(hx :rec m :re-sel :eval (hx-match-char 'quote))))
     ("mt" . ("match tag" . ,(hx :rec m :re-sel :eval hx-match-tag)))
+    ("ms" . ("match select" . (keymap)))
     ("msm" . ("select any pair" . ,(hx :rec m :re-hl :eval (hx-match-select))))
     ("msp" . ("select bracket" . ,(hx :rec m :re-hl :eval (hx-match-select 'bracket))))
     ("msq" . ("select quote" . ,(hx :rec m :re-hl :eval (hx-match-select 'quote))))
@@ -1079,6 +1085,7 @@ Should be called only before entering multiple-cursors-mode."
     (" dF" . ("find file in dir (recursive)" . consult-fd))
     (" ds" . ("search in dir" . consult-ripgrep))
     (" dt" . ("dired tree" . dired-sidebar-toggle-sidebar))
+    (" dn" . ("new file/dir" . (keymap)))
     (" dnf" . ("new file" . dired-create-empty-file))
     (" dnd" . ("new dir" . dired-create-directory))
     (" bg" . ("go to (buffer)" . consult-buffer))
@@ -1120,7 +1127,7 @@ Should be called only before entering multiple-cursors-mode."
     (" lf" . ("quickfix (LSP)" . eglot-code-action-quickfix))
     ;; shell
     (" sx" . ("shell command" . shell-command))
-    (" sr" . ("shell command on region (as input)" . ,(hx :region :eval shell-command-on-region)))
+    (" sr" . ("shell command on region (as input)" . ,(hx :region t :eval shell-command-on-region)))
     ;; git
     (" go" . ("open magit" . magit-status))
     (" gd" . ("show diff" . vc-diff))
@@ -1131,19 +1138,24 @@ Should be called only before entering multiple-cursors-mode."
     ("`sl" . ("sort lines" . ,(hx :arg (b "Ascending?") :save :eval (hx-region-apply (-partial #'sort-lines (not arg))))))
     ("`sc" . ("sort columns" . ,(hx :arg (b "Ascending?") :save :eval (hx-region-apply (-partial #'sort-columns (not arg))))))
     ;; ai
+    (" ac" . ("ai code actions" . (keymap)))
     (" acc" . ("code complete" . ,(hx :region :eval ellama-code-complete)))
     (" aca" . ("code add" . ,(hx :region :eval ellama-code-add)))
     (" ace" . ("code edit" . ,(hx :region :eval ellama-code-edit)))
     (" aci" . ("code improve" . ,(hx :region :eval ellama-code-improve)))
     (" acr" . ("code review" . ,(hx :region :eval ellama-code-review)))
+    (" as" . ("ai summarize" . (keymap)))
     (" ass" . ("summarize" . ,(hx :region :eval ellama-summarize)))
     (" asw" . ("summarize webpage" . ,(hx :region :eval ellama-summarize-webpage)))
+    (" ai" . ("ai improve" . (keymap)))
     (" aiw" . ("improve wording" . ,(hx :region :eval ellama-improve-wording)))
     (" aig" . ("improve grammar" . ,(hx :region :eval ellama-improve-grammar)))
     (" aic" . ("improve conciseness" . ,(hx :region :eval ellama-improve-conciseness)))
+    (" aa" . ("ai ask" . (keymap)))
     (" aaa" . ("ask about" . ,(hx :region :eval ellama-ask-about)))
     (" aai" . ("ask interactively" . ,(hx :region :eval ellama-chat)))
     (" aas" . ("ask selection" . ,(hx :region :eval ellama-ask-selection)))
+    (" at" . ("ai text actions" . (keymap)))
     (" att" . ("text translate" . ,(hx :region :eval ellama-translate)))
     (" atc" . ("text complete" . ,(hx :region :eval ellama-complete)))
     ;; structural moving/editing
@@ -1153,6 +1165,7 @@ Should be called only before entering multiple-cursors-mode."
     ("ss;" . ("forward" . ,(hx :rec m :eval hx-struct-forward)))
     ("sl" . ("up in hierarchy (TS)" . ,(hx :rec m :eval hx-struct-up)))
     ("sk" . ("down into hierarchy (TS)" . ,(hx :rec m :eval hx-struct-down)))
+    ("sd" . ("drag" . (keymap)))
     ("sdj" . ("drag backward in sibling (TS)" . ,(hx :rec c :eval hx-struct-drag-backward)))
     ("sd;" . ("drag forward in sibling (TS)" . ,(hx :rec c :eval hx-struct-drag-forward)))
     ("sdl" . ("drag up in hierarchy (TS)" . ,(hx :rec c :eval hx-struct-drag-up)))
