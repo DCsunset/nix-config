@@ -13,6 +13,7 @@
               js-indent-level 2
               typescript-ts-mode-indent-offset 2
               go-ts-mode-indent-offset 2
+              lua-indent-level 2
               rust-ts-mode-indent-offset 2
               ess-fancy-comments nil  ; indent comment line as normal code
               select-enable-clipboard nil  ; don't paste to clipboard by default
@@ -78,9 +79,12 @@
     nix-mode
     lua-mode
     latex-mode) . eglot-ensure)
-  :init
+  :custom
   ; disable event buffer (hangs frequently in js/ts)
-  (setq eglot-events-buffer-size 0))
+  (eglot-events-buffer-size 0)
+  :config
+  (add-to-list 'eglot-server-programs
+               '(lua-mode . ("lua-language-server" "--configpath=@lua-language-server-config@"))))
 
 
 ;; tree-sitter (put at the end as some packages above may change auto-mode-alist)

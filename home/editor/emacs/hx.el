@@ -425,16 +425,17 @@ The following options are available:
                               (goto-char cur)))))
          (region-wrapper (lambda (f)
                            (if (not (plist-member opts :region)) f
-                             ;; transient-mark-mode must be true
-                             ;; for region-active-p to be true
-                             `(let ((transient-mark-mode t)
-                                    (region (hx-region)))
-                                  (save-mark-and-excursion
-                                    (when (or ,(and (plist-get opts :region) t)
-                                              hx--mark)
+                             `(if (or ,(and (plist-get opts :region) t)
+                                      hx--mark)
+                                  ;; transient-mark-mode must be true
+                                  ;; for region-active-p to be true
+                                  (let ((transient-mark-mode t)
+                                        (region (hx-region)))
+                                    (save-mark-and-excursion
                                       (goto-char (car region))
-                                      (set-mark (cdr region)))
-                                    ,f)))))
+                                      (set-mark (cdr region))
+                                      ,f))
+                                ,f))))
          (re-hl-wrapper (lambda (f)
                            (if (not (plist-member opts :re-hl)) f
                              `(progn

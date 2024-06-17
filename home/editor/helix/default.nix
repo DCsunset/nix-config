@@ -1,4 +1,4 @@
-{ lib, mylib, ... }:
+{ config, lib, mylib, ... }:
 
 with lib;
 {
@@ -64,8 +64,8 @@ with lib;
           c = "change_selection_noyank";
           d = "delete_selection_noyank";
           Q = ":buffer-close";
-          "A-["= "jump_backward";
-          "A-]" = "jump_forward";
+          "{" = "jump_backward";
+          "}" = "jump_forward";
           A-s = "save_selection";
         };
       in {
@@ -79,10 +79,10 @@ with lib;
             ";" = "move_char_right";
             K = "move_line_down";
             L = "move_line_up";
-            C-j = replicate 5 "move_char_left";
-            C-k = replicate 5 "move_visual_line_down";
-            C-l = replicate 5 "move_visual_line_up";
-            "C-;" = replicate 5 "move_char_right";
+            C-j = replicate 10 "move_char_left";
+            C-k = replicate 10 "move_visual_line_down";
+            C-l = replicate 10 "move_visual_line_up";
+            "C-;" = replicate 10 "move_char_right";
           }
         ];
 
@@ -96,10 +96,10 @@ with lib;
             ";" = "extend_char_right";
             K = "extend_line_down";
             L = "extend_line_up";
-            C-j = replicate 5 "extend_char_left";
-            C-k = replicate 5 "extend_visual_line_down";
-            C-l = replicate 5 "extend_visual_line_up";
-            "C-;" = replicate 5 "extend_char_right";
+            C-j = replicate 10 "extend_char_left";
+            C-k = replicate 10 "extend_visual_line_down";
+            C-l = replicate 10 "extend_visual_line_up";
+            "C-;" = replicate 10 "extend_char_right";
           }
         ];
 

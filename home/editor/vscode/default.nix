@@ -1,6 +1,6 @@
-{ lib, pkgs, ... }:
+{ pkgs, ... }:
 
-with lib; {
+{
   programs.vscode = {
     enable = true;
     package = pkgs.vscodium;
