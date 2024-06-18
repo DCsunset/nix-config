@@ -5,7 +5,7 @@
 
   # language servers
   config = {
-    home.systemPackages = with pkgs; [
+    home.packages = with pkgs; [
       # language servers (used by helix and emacs)
       clang-tools
       # for HTML/CSS/JSON/ESLint language servers
