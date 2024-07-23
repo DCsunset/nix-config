@@ -56,6 +56,7 @@
       nerd-icons-dired
       projectile
       consult
+      envrc
       rg
 
       # ai.el
@@ -81,6 +82,7 @@
       vterm-toggle
       diff-hl
       hl-todo
+      blamer
       magit
       magit-todos
       xeft

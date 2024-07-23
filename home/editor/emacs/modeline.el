@@ -8,8 +8,6 @@
   (declare (indent defun))
   `(progn
      (defvar-local ,symbol '(:eval ,form))
-     ;; FIXME: debug
-     (setq ,symbol '(:eval ,form))
      ;; need this propertize to work modeline
      (put ',symbol 'risky-local-variable t)))
 
@@ -100,7 +98,16 @@ CMD1 for \\`mouse-1' and CMD3 for \\`mouse-3'."
                                   (buffer-modified-p))
                          '((t :slant italic :weight bold)))
                  'help-echo path
-                 'local-map my-modeline--buffer-map))))
+                 'local-map my-modeline--buffer-map)
+     " "
+     ;; column
+     (propertize (format "%s %d" (nerd-icons-codicon "nf-cod-split_horizontal") (current-column))
+                 'help-echo "Column")
+     ;; region
+     (if (equal modaled-state "select")
+         (propertize (format " %s %d" (nerd-icons-codicon "nf-cod-primitive_square") (hx-region-size))
+                     'help-echo "Region size")
+       ""))))
 
 ;;; eglot
 (defvar-local my-modeline-eglot nil)
@@ -213,7 +220,7 @@ CMD1 for \\`mouse-1' and CMD3 for \\`mouse-3'."
                 my-modeline-modaled
                 my-modeline-buffer
 
-                "        "  ; FIXME: remove this after Emacs 30
+                "              "  ; FIXME: remove this after Emacs 30
                 mode-line-format-right-align  ; emacs 30
 
                 my-modeline-eglot

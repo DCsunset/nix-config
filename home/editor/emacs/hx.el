@@ -63,11 +63,11 @@ This is necessary to distinguish the meta key and actual escape in terminal."
       (when (and
              (eq (terminal-live-p term) t)  ; only patch char only terminal
              (not (terminal-parameter term 'hx-esc-map)))  ; not patched already
-        (let ((hx-esc-map (lookup-key input-decode-map [?\e])))
+        (let ((hx-esc-map (keymap-lookup input-decode-map "ESC")))
           ; remember the old map for restoration later and prevent patching it again
           (set-terminal-parameter term 'hx-esc-map hx-esc-map)
-          (define-key input-decode-map [?\e]
-            `(menu-item "" ,hx-esc-map :filter ,#'hx--esc-filter)))))))
+          (keymap-set input-decode-map "ESC"
+                      `(menu-item "" ,hx-esc-map :filter ,#'hx--esc-filter)))))))
 
 (defun hx--deinit-esc (frame)
   "Disable escape translation in `input-decode-map' for terminal FRAME."
@@ -76,7 +76,7 @@ This is necessary to distinguish the meta key and actual escape in terminal."
       (when (eq (terminal-live-p term) t)
         (let ((hx-esc-map (terminal-parameter term 'hx-esc-map)))
           (when hx-esc-map
-            (define-key input-decode-map [?\e] hx-esc-map)
+            (keymap-set input-decode-map "ESC" hx-esc-map)
             (set-terminal-parameter term 'hx-esc-map nil)))))))
 
 (defvar hx-esc-mode nil
@@ -180,6 +180,8 @@ Toggle it when ARG is nil or 0."
 (defun hx-region-replace (char)
   "Replace region with given CHAR."
   (unless (eq char ?\e)  ; cancel replace when char is ESC
+    ;; Return key corresponds to \r not \n
+    (when (eq char ?\r) (setq char ?\n))
     (let ((size (hx-region-size))
           (pos (point)))
       (hx-region-apply #'delete-region)
@@ -972,7 +974,7 @@ Should be called only before entering multiple-cursors-mode."
     ("n" . ("next match" . ,(hx :re-hl :eval isearch-repeat-forward backward-char (hx-set-mark isearch-other-end) isearch-exit)))
     ("N" . ("prev match" . ,(hx :re-hl :eval isearch-repeat-backward (hx-set-mark (1- isearch-other-end)) isearch-exit)))
     ("*" . ("search selection" . ,(hx :eval (setq isearch-string (hx-region-string)))))
-    (,(kbd "M-/") . ("search lines" . occur))))
+    ("M-/" . ("search lines" . occur))))
 
 (add-hook
  'modaled-select-state-mode-hook
@@ -1002,13 +1004,13 @@ Should be called only before entering multiple-cursors-mode."
     ("k" . ("down (visual)" . ,(hx :re-sel :eval next-line)))
     ("L" . ("up (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval previous-line)))
     ("K" . ("down (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval next-line)))
-    (,(kbd "C-j") . ("left 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
+    ("C-j" . ("left 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                        (funcall-interactively #'backward-char (* (car l-args) 10)))))
-    (,(kbd "C-;") . ("right 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
+    ("C-;" . ("right 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                         (funcall-interactively #'forward-char (* (car l-args) 10)))))
-    (,(kbd "C-l") . ("up 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
+    ("C-l" . ("up 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                      (funcall-interactively #'previous-line (* (car l-args) 10)))))
-    (,(kbd "C-k") . ("down 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
+    ("C-k" . ("down 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                        (funcall-interactively #'next-line (* (car l-args) 10)))))
     ("w" . ("next word" . ,(hx :re-hl :eval (hx-next-word (equal modaled-state "normal")))))
     ("b" . ("prev word" . ,(hx :re-hl :eval (hx-previous-word (equal modaled-state "normal")))))
@@ -1017,32 +1019,26 @@ Should be called only before entering multiple-cursors-mode."
     ("F" . ("find prev char" . ,(hx :rec m :arg (c "Find prev: ") :re-hl :eval (hx-find-char arg -1 0 (equal modaled-state "normal")))))
     ("T" . ("find till prev char" . ,(hx :rec m :arg (c "Till prev: ") :re-hl :eval (hx-find-char arg -1 1 (equal modaled-state "normal")))))
     ;; goto mode
-    ("gg" . ("go to line" . ,(hx :arg-desc "p" :re-sel :eval (forward-line (- (car l-args) (line-number-at-pos))))))
-    ("gi" . ("go to item" . consult-imenu))
-    ("gl" . ("go to line interactively" . consult-goto-line))
-    ("gs" . ("search and go to line" . consult-line))
-    ("ge" . ("end of file" . ,(hx :re-sel :eval (goto-char (point-max)))))
-    ("gj" . ("start of line (visual)" . ,(hx :re-sel :eval beginning-of-visual-line)))
-    ("g;" . ("end of line (visual)" . ,(hx :re-sel :eval end-of-visual-line (re-search-backward ".\\|^"))))  ; move to last char if exists
-    ("gJ" . ("start of line (text)" . ,(hx :re-sel :eval beginning-of-line)))
-    ("g:" . ("end of line (text)" . ,(hx :re-sel :eval end-of-line (re-search-backward ".\\|^"))))  ; move to last char if exists
-    ("gn" . ("next buffer" . centaur-tabs-forward))
-    ("gp" . ("prev buffer" . centaur-tabs-backward))
-    ("gN" . ("next buffer" . centaur-tabs-forward-group))
-    ("gP" . ("prev buffer" . centaur-tabs-backward-group))
-    ("gd" . ("go to def" . ,(hx :jump :let (xref-prompt-for-identifier nil) :eval xref-find-definitions)))
+    ("g g" . ("go to line" . ,(hx :arg-desc "p" :re-sel :eval (forward-line (- (car l-args) (line-number-at-pos))))))
+    ("g i" . ("go to item" . consult-imenu))
+    ("g l" . ("go to line interactively" . consult-goto-line))
+    ("g s" . ("search and go to line" . consult-line))
+    ("g e" . ("end of file" . ,(hx :re-sel :eval (goto-char (point-max)))))
+    ("g j" . ("start of line" . ,(hx :re-sel :eval beginning-of-line)))
+    ("g ;" . ("end of line" . ,(hx :re-sel :eval end-of-line (re-search-backward ".\\|^"))))  ; move to last char if exists
+    ("g d" . ("go to def" . ,(hx :jump :let (xref-prompt-for-identifier nil) :eval xref-find-definitions)))
     ;; match mode
-    ("mm" . ("match any char" . ,(hx :rec m :re-sel :eval hx-match-char)))
-    ("mb" . ("match bracket" . ,(hx :rec m :re-sel :eval (hx-match-char 'bracket))))
-    ("mq" . ("match quote" . ,(hx :rec m :re-sel :eval (hx-match-char 'quote))))
-    ("mt" . ("match tag" . ,(hx :rec m :re-sel :eval hx-match-tag)))
-    ("ms" . ("match select" . (keymap)))
-    ("msm" . ("select any pair" . ,(hx :rec m :re-hl :eval (hx-match-select))))
-    ("msp" . ("select bracket" . ,(hx :rec m :re-hl :eval (hx-match-select 'bracket))))
-    ("msq" . ("select quote" . ,(hx :rec m :re-hl :eval (hx-match-select 'quote))))
-    ("ma" . ("surround with pair" . ,(hx :rec c :arg (c "Surround: ") :re-hl :eval modaled-set-main-state (hx-match-add arg))))
-    ("mrc" . ("replace surrounding char" . ,(hx :rec c :arg (c "Surround replace: ") :re-hl :eval modaled-set-main-state (hx-match-replace arg))))
-    ("mrt" . ("rename jsx tag" . ,(hx :re-hl :eval modaled-set-main-state jtsx-rename-jsx-element)))
+    ("m m" . ("match any char" . ,(hx :rec m :re-sel :eval hx-match-char)))
+    ("m b" . ("match bracket" . ,(hx :rec m :re-sel :eval (hx-match-char 'bracket))))
+    ("m q" . ("match quote" . ,(hx :rec m :re-sel :eval (hx-match-char 'quote))))
+    ("m t" . ("match tag" . ,(hx :rec m :re-sel :eval hx-match-tag)))
+    ("m s" . ("match select" . (keymap)))
+    ("m s m" . ("select any pair" . ,(hx :rec m :re-hl :eval (hx-match-select))))
+    ("m s p" . ("select bracket" . ,(hx :rec m :re-hl :eval (hx-match-select 'bracket))))
+    ("m s q" . ("select quote" . ,(hx :rec m :re-hl :eval (hx-match-select 'quote))))
+    ("m a" . ("surround with pair" . ,(hx :rec c :arg (c "Surround: ") :re-hl :eval modaled-set-main-state (hx-match-add arg))))
+    ("m r c" . ("replace surrounding char" . ,(hx :rec c :arg (c "Surround replace: ") :re-hl :eval modaled-set-main-state (hx-match-replace arg))))
+    ("m r t" . ("rename jsx tag" . ,(hx :re-hl :eval modaled-set-main-state jtsx-rename-jsx-element)))
     ;; changes
     ("i" . ("insert before" . ,(hx :rec c :eval hx-no-sel (modaled-set-state "insert"))))
     ("a" . ("insert after" . ,(hx :rec c :eval hx-no-sel (modaled-set-state "insert") forward-char)))
@@ -1056,54 +1052,127 @@ Should be called only before entering multiple-cursors-mode."
     ("c" . ("change" . ,(hx :rec c :eval (modaled-set-state "insert") (hx-region-apply #'delete-region) hx-no-sel)))
     ("P" . ("paste before" . ,(hx :rec c :eval (hx-paste (current-kill 0 t) -1) hx-no-sel)))
     ("p" . ("paste after" . ,(hx :rec c :eval (hx-paste (current-kill 0 t) +1) hx-no-sel)))
-    (,(kbd "M-P") . ("paste before from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") -1) hx-no-sel)))
-    (,(kbd "M-p") . ("paste after from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") +1) hx-no-sel)))
+    ("M-P" . ("paste before from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") -1) hx-no-sel)))
+    ("M-p" . ("paste after from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") +1) hx-no-sel)))
     ("J" . ("join lines" . hx-join-lines))
     ("u" . ("undo" . ,(hx :once :eval hx-no-sel undo-fu-only-undo)))
     ("U" . ("redo" . ,(hx :once :eval hx-no-sel undo-fu-only-redo)))
-    (,(kbd "M-U") . ("redo all" . ,(hx :once :eval hx-no-sel undo-fu-only-redo-all)))
+    ("M-U" . ("redo all" . ,(hx :once :eval hx-no-sel undo-fu-only-redo-all)))
     (">" . ("indent" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-rigidly 2))))
     ("<" . ("unindent" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-rigidly -2))))
     ("=" . ("format" . ,(hx :re-hl :eval (hx-extended-region-apply #'indent-region))))
-    (,(kbd "C-c") . ("comment/uncomment" . ,(hx :re-hl :eval (hx-extended-region-apply #'comment-or-uncomment-region))))
+    ("C-c" . ("comment/uncomment" . ,(hx :re-hl :eval (hx-extended-region-apply #'comment-or-uncomment-region))))
     ;; selection
     ("x" . ("extend line below" . ,(hx :re-hl :eval hx-extend-line-below)))
     ("X" . ("extend line" . ,(hx :re-hl :eval hx-extend-to-line-bounds)))
     ("e" . ("extend one char" . ,(hx :re-hl :eval hx-extend-char)))
     ("E" . ("shrink one char" . ,(hx :re-hl :eval hx-shrink-char)))
     ;; multiple cursors
-    ("C" . ("toggle cursor and next line" . ,(hx :eval hx-toggle-cursor next-line)))
-    (,(kbd "M-C") . ("remove all cursors" . hx-remove-cursors))
-    (,(kbd "M-c") . ("toggle multiple-cursors-mode" . hx-toggle-multiple-cursors))
-    (,(kbd "M-<mouse-1>") . ("toggle cursor on click" . hx-toggle-cursor-on-click))
-    ;; space mode
-    (" cP" . ("clipboard paste before" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) -1) hx-no-sel)))
-    (" cp" . ("clipboard paste after" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) +1) hx-no-sel)))
-    (" cy" . ("copy to clipboard" . ,(hx :eval modaled-set-main-state (xclip-set-selection 'clipboard (hx-region-string)))))
-    (" pf" . ("find file in project" . projectile-find-file))
-    (" ps" . ("search in project" . projectile-ripgrep))
-    (" df" . ("find file in dir" . find-file))
-    (" dF" . ("find file in dir (recursive)" . consult-fd))
-    (" ds" . ("search in dir" . consult-ripgrep))
-    (" dt" . ("dired tree" . dired-sidebar-toggle-sidebar))
-    (" dn" . ("new file/dir" . (keymap)))
-    (" dnf" . ("new file" . dired-create-empty-file))
-    (" dnd" . ("new dir" . dired-create-directory))
-    (" bg" . ("go to (buffer)" . consult-buffer))
-    (" br" . ("reload buffer" . revert-buffer))
-    (" ?" . ("search symbol" . apropos))
-    (" k" . ("show eldoc" . hx-show-eldoc))
-    (" u" . ("undo tree" . vundo))
-    (" jg" . ("go to (jump list)" . hx-jump-goto))
-    (" jc" . ("clear jump list" . hx-jump-clear))
-    (" ep" . ("prev error" . ,(hx :rec m
+    ("C" . ("toggle cursor and next line" . ,(hx :let (line-move-visual nil) :eval hx-toggle-cursor next-line)))
+    ("M-C" . ("remove all cursors" . hx-remove-cursors))
+    ("M-c" . ("toggle multiple-cursors-mode" . hx-toggle-multiple-cursors))
+    ("M-<mouse-1>" . ("toggle cursor on click" . hx-toggle-cursor-on-click))
+    ;; transformation mode (backtick)
+    ("` c" . ("case" . (keymap)))
+    ("` c u" . ("upper case" . ,(hx :eval (hx-region-apply #'upcase-region))))
+    ("` c l" . ("lower case" . ,(hx :eval (hx-region-apply #'downcase-region))))
+    ("` c c" . ("capitalized case" . ,(hx :eval (hx-region-apply #'capitalize-region))))
+    ("` s" . ("sort" . (keymap)))
+    ("` s l" . ("sort lines" . ,(hx :arg (b "Ascending?") :save :eval (hx-region-apply (-partial #'sort-lines (not arg))))))
+    ("` s c" . ("sort columns" . ,(hx :arg (b "Ascending?") :save :eval (hx-region-apply (-partial #'sort-columns (not arg))))))
+    ("` r" . ("replace" . (keymap)))
+    ("` r r" . ("replace regex" . ,(hx :region :eval replace-regexp)))
+    ("` r s" . ("replace string" . ,(hx :region :eval replace-string)))
+    ;; structural moving/editing
+    ("s j" . ("prev" . ,(hx :rec m :eval hx-struct-prev)))
+    ("s ;" . ("next" . ,(hx :rec m :eval hx-struct-next)))
+    ("s s j" . ("backward" . ,(hx :rec m :eval hx-struct-backward)))
+    ("s s ;" . ("forward" . ,(hx :rec m :eval hx-struct-forward)))
+    ("s l" . ("up in hierarchy (TS)" . ,(hx :rec m :eval hx-struct-up)))
+    ("s k" . ("down into hierarchy (TS)" . ,(hx :rec m :eval hx-struct-down)))
+    ("s d" . ("drag" . (keymap)))
+    ("s d j" . ("drag backward in sibling (TS)" . ,(hx :rec c :eval hx-struct-drag-backward)))
+    ("s d ;" . ("drag forward in sibling (TS)" . ,(hx :rec c :eval hx-struct-drag-forward)))
+    ("s d l" . ("drag up in hierarchy (TS)" . ,(hx :rec c :eval hx-struct-drag-up)))
+    ("s d k" . ("drag down in hierarchy (TS)" . ,(hx :rec c :eval hx-struct-drag-down)))
+    ("s W" . ("wrap struct (TS)" . ,(hx :rec c :eval hx-struct-wrap)))
+    ("s D" . ("delete struct (TS)" . ,(hx :rec c :eval hx-struct-delete)))
+    ;; misc
+    ("{" . ("jump backward" . hx-jump-backward))
+    ("}" . ("jump forward" . hx-jump-forward))
+    ("M-s" . ("save to jump list" . hx-jump-save))
+    ("M-S" . ("remove from jump list" . hx-jump-remove))
+    ("." . ("repeat change" . ,(hx :eval (hx-run-command-record 'c))))
+    ("M-." . ("select change" . ,(hx :eval (hx-select-command-record 'c))))
+    ("," . ("repeat motion" . ,(hx :eval (hx-run-command-record 'm))))
+    ("M-," . ("select motion" . ,(hx :eval (hx-select-command-record 'm))))
+    ;; note: TAB is the same as C-i in terminal
+    (("TAB" "<tab>") . ("toggle visibility" . hx-toggle-visibility))
+    ("|" . ("expr eval" . eval-expression))
+    ("\\" . ("eval region" . ,(hx :eval (hx-region-apply #'eval-region t))))
+    ("q" . ("quit window" . quit-window))
+    ("Q" . ("kill buffer" . kill-this-buffer))
+    ;; hx-arg
+    ("<f1>" . ("hx-arg f1" . ,(hx :eval
+                                (message "hx-arg: 'f1")
+                                (setq hx-arg-next 'f1
+                                      hx-arg-persist t))))
+    ("<f2>" . ("hx-arg f2" . ,(hx :eval
+                                (message "hx-arg: 'f2")
+                                (setq hx-arg-next 'f2
+                                      hx-arg-persist t))))
+    ("<f3>" . ("hx-arg f3" . ,(hx :eval
+                                (message "hx-arg: 'f3")
+                                (setq hx-arg-next 'f3
+                                      hx-arg-persist t))))
+    ("<f4>" . ("hx-arg f4" . ,(hx :eval
+                                (message "hx-arg: 'f4")
+                                (setq hx-arg-next 'f4
+                                      hx-arg-persist t))))
+    ;; major-mode specific command
+    ("' x" . ,(hx :region :let (command (keymap-lookup (current-local-map) "C-c C-c"))
+               :eval (when command (call-interactively command))))))
+
+;; space mode
+(modaled-define-keys
+  :states '("normal" "select" "major")
+  :bind
+  `(("SPC '" . ("Toggle major state" . ,(hx :eval (modaled-set-state
+                                                (if (equal modaled-state "major")
+                                                    "normal"
+                                                  "major")))))
+    ("SPC c" . ("clipboard" . (keymap)))
+    ("SPC c P" . ("clipboard paste before" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) -1) hx-no-sel)))
+    ("SPC c p" . ("clipboard paste after" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) +1) hx-no-sel)))
+    ("SPC c y" . ("copy to clipboard" . ,(hx :eval modaled-set-main-state (xclip-set-selection 'clipboard (hx-region-string)))))
+    ("SPC p" . ("projectile" . (keymap)))
+    ("SPC p f" . ("find file in project" . projectile-find-file))
+    ("SPC p s" . ("search in project" . projectile-ripgrep))
+    ("SPC d" . ("dired" . (keymap)))
+    ("SPC d f" . ("find file in dir" . find-file))
+    ("SPC d F" . ("find file in dir (recursive)" . consult-fd))
+    ("SPC d s" . ("search in dir" . consult-ripgrep))
+    ("SPC d t" . ("dired tree" . dired-sidebar-toggle-sidebar))
+    ("SPC d n" . ("new file/dir" . (keymap)))
+    ("SPC d n f" . ("new file" . dired-create-empty-file))
+    ("SPC d n d" . ("new dir" . dired-create-directory))
+    ("SPC b" . ("buffer" . (keymap)))
+    ("SPC b g" . ("go to (buffer)" . consult-buffer))
+    ("SPC b r" . ("reload buffer" . revert-buffer))
+    ("SPC ?" . ("search symbol" . apropos))
+    ("SPC k" . ("show eldoc" . hx-show-eldoc))
+    ("SPC u" . ("undo tree" . vundo))
+    ("SPC j" . ("jump list" . (keymap)))
+    ("SPC j g" . ("go to (jump list)" . hx-jump-goto))
+    ("SPC j c" . ("clear jump list" . hx-jump-clear))
+    ("SPC e p" . ("prev error" . ,(hx :rec m
                                   :let (types (pcase hx-arg
                                                 ('f1 '(:error))
                                                 ('f2 '(:warning))
                                                 ('f3 '(:note))
                                                 (_ '(:error :warning))))
                                   :eval (flymake-goto-prev-error nil types t))))
-    (" en" . ("next error" . ,(hx :rec m
+    ("SPC e n" . ("next error" . ,(hx :rec m
                                   :let (types (pcase hx-arg
                                                 ('f1 '(:error))
                                                 ('f2 '(:warning))
@@ -1111,121 +1180,74 @@ Should be called only before entering multiple-cursors-mode."
                                                 (_ '(:error :warning))))
                                   :eval (flymake-goto-next-error nil types t))))
     ;; gtd
-    (" tl" . ("gtd list" . org-todo-list))
-    (" ti" . ("gtd inbox" . ,(hx :eval (find-file (gtd-file "inbox.org")))))
-    (" ta" . ("gtd actions" . ,(hx :eval (find-file (gtd-file "actions.org")))))
-    (" tc" . ("gtd capture" . ,(hx :eval (org-capture nil "ti"))))
+    ("SPC t" . ("gtd" . (keymap)))
+    ("SPC t l" . ("gtd list" . org-todo-list))
+    ("SPC t i" . ("gtd inbox" . ,(hx :eval (find-file (gtd-file "inbox.org")))))
+    ("SPC t a" . ("gtd actions" . ,(hx :eval (find-file (gtd-file "actions.org")))))
+    ("SPC t c" . ("gtd capture" . ,(hx :eval (org-capture nil "ti"))))
     ;; notes (org-roam & xeft)
-    (" nf" . ("note find" . org-roam-node-find))
-    (" ns" . ("note search" . xeft))
-    (" nc" . ("note create" . org-roam-capture))
-    (" ni" . ("note insert" . org-roam-node-insert))
-    (" nl" . ("note backlinks" . org-roam-buffer-toggle))
+    ("SPC n" . ("notes" . (keymap)))
+    ("SPC n f" . ("note find" . org-roam-node-find))
+    ("SPC n s" . ("note search" . xeft))
+    ("SPC n c" . ("note create" . org-roam-capture))
+    ("SPC n i" . ("note insert" . org-roam-node-insert))
+    ("SPC n l" . ("note backlinks" . org-roam-buffer-toggle))
     ;; LSP
-    (" lr" . ("rename (LSP)" . eglot-rename))
-    (" l=" . ("format (LSP)" . eglot-format-buffer))
-    (" la" . ("action (LSP)" . eglot-code-actions))
-    (" lf" . ("quickfix (LSP)" . eglot-code-action-quickfix))
+    ("SPC l" . ("lsp" . (keymap)))
+    ("SPC l r" . ("rename" . eglot-rename))
+    ("SPC l =" . ("format" . eglot-format-buffer))
+    ("SPC l a" . ("action" . eglot-code-actions))
+    ("SPC l f" . ("quickfix" . eglot-code-action-quickfix))
     ;; shell
-    (" sx" . ("shell command" . shell-command))
-    (" sr" . ("shell command on region (as input)" . ,(hx :region t :eval shell-command-on-region)))
+    ("SPC s" . ("shell" . (keymap)))
+    ("SPC s x" . ("shell command" . shell-command))
+    ("SPC s r" . ("shell command on region (as input)" . ,(hx :region t :eval shell-command-on-region)))
     ;; git
-    (" go" . ("open magit" . magit-status))
-    (" gd" . ("show diff" . vc-diff))
-    ;; transformation mode (backtick)
-    ("`cu" . ("upper case" . ,(hx :eval (hx-region-apply #'upcase-region))))
-    ("`cl" . ("lower case" . ,(hx :eval (hx-region-apply #'downcase-region))))
-    ("`cc" . ("capitalized case" . ,(hx :eval (hx-region-apply #'capitalize-region))))
-    ("`sl" . ("sort lines" . ,(hx :arg (b "Ascending?") :save :eval (hx-region-apply (-partial #'sort-lines (not arg))))))
-    ("`sc" . ("sort columns" . ,(hx :arg (b "Ascending?") :save :eval (hx-region-apply (-partial #'sort-columns (not arg))))))
+    ("SPC g" . ("git" . (keymap)))
+    ("SPC g b" . ("blamer-mode" . blamer-mode))
+    ("SPC g i" . ("show commit info" . blamer-show-commit-info))
+    ("SPC g o" . ("open magit" . magit-status))
+    ("SPC g d" . ("show diff" . vc-diff))
     ;; ai
-    (" ac" . ("ai code actions" . (keymap)))
-    (" acc" . ("code complete" . ,(hx :region :eval ellama-code-complete)))
-    (" aca" . ("code add" . ,(hx :region :eval ellama-code-add)))
-    (" ace" . ("code edit" . ,(hx :region :eval ellama-code-edit)))
-    (" aci" . ("code improve" . ,(hx :region :eval ellama-code-improve)))
-    (" acr" . ("code review" . ,(hx :region :eval ellama-code-review)))
-    (" as" . ("ai summarize" . (keymap)))
-    (" ass" . ("summarize" . ,(hx :region :eval ellama-summarize)))
-    (" asw" . ("summarize webpage" . ,(hx :region :eval ellama-summarize-webpage)))
-    (" ai" . ("ai improve" . (keymap)))
-    (" aiw" . ("improve wording" . ,(hx :region :eval ellama-improve-wording)))
-    (" aig" . ("improve grammar" . ,(hx :region :eval ellama-improve-grammar)))
-    (" aic" . ("improve conciseness" . ,(hx :region :eval ellama-improve-conciseness)))
-    (" aa" . ("ai ask" . (keymap)))
-    (" aaa" . ("ask about" . ,(hx :region :eval ellama-ask-about)))
-    (" aai" . ("ask interactively" . ,(hx :region :eval ellama-chat)))
-    (" aas" . ("ask selection" . ,(hx :region :eval ellama-ask-selection)))
-    (" at" . ("ai text actions" . (keymap)))
-    (" att" . ("text translate" . ,(hx :region :eval ellama-translate)))
-    (" atc" . ("text complete" . ,(hx :region :eval ellama-complete)))
-    ;; structural moving/editing
-    ("sj" . ("prev" . ,(hx :rec m :eval hx-struct-prev)))
-    ("s;" . ("next" . ,(hx :rec m :eval hx-struct-next)))
-    ("ssj" . ("backward" . ,(hx :rec m :eval hx-struct-backward)))
-    ("ss;" . ("forward" . ,(hx :rec m :eval hx-struct-forward)))
-    ("sl" . ("up in hierarchy (TS)" . ,(hx :rec m :eval hx-struct-up)))
-    ("sk" . ("down into hierarchy (TS)" . ,(hx :rec m :eval hx-struct-down)))
-    ("sd" . ("drag" . (keymap)))
-    ("sdj" . ("drag backward in sibling (TS)" . ,(hx :rec c :eval hx-struct-drag-backward)))
-    ("sd;" . ("drag forward in sibling (TS)" . ,(hx :rec c :eval hx-struct-drag-forward)))
-    ("sdl" . ("drag up in hierarchy (TS)" . ,(hx :rec c :eval hx-struct-drag-up)))
-    ("sdk" . ("drag down in hierarchy (TS)" . ,(hx :rec c :eval hx-struct-drag-down)))
-    ("sW" . ("wrap struct (TS)" . ,(hx :rec c :eval hx-struct-wrap)))
-    ("sD" . ("delete struct (TS)" . ,(hx :rec c :eval hx-struct-delete)))
-    ;; misc
-    ("{" . ("jump backward" . hx-jump-backward))
-    ("}" . ("jump forward" . hx-jump-forward))
-    (,(kbd "M-s") . ("save to jump list" . hx-jump-save))
-    (,(kbd "M-S") . ("remove from jump list" . hx-jump-remove))
-    ("." . ("repeat change" . ,(hx :eval (hx-run-command-record 'c))))
-    (,(kbd "M-.") . ("select change" . ,(hx :eval (hx-select-command-record 'c))))
-    ("," . ("repeat motion" . ,(hx :eval (hx-run-command-record 'm))))
-    (,(kbd "M-,") . ("select motion" . ,(hx :eval (hx-select-command-record 'm))))
-    ;; note: TAB is the same as C-i in terminal
-    ((,(kbd "TAB") ,(kbd "<tab>")) . ("toggle visibility" . hx-toggle-visibility))
-    ("|" . ("expr eval" . eval-expression))
-    ("\\" . ("eval region" . ,(hx :eval (hx-region-apply #'eval-region t))))
-    ("q" . ("quit window" . quit-window))
-    ("Q" . ("kill buffer" . kill-this-buffer))
-    ;; hx-arg
-    ([f1] . ("hx-arg f1" . ,(hx :eval
-                                (message "hx-arg: 'f1")
-                                (setq hx-arg-next 'f1
-                                      hx-arg-persist t))))
-    ([f2] . ("hx-arg f2" . ,(hx :eval
-                                (message "hx-arg: 'f2")
-                                (setq hx-arg-next 'f2
-                                      hx-arg-persist t))))
-    ([f3] . ("hx-arg f3" . ,(hx :eval
-                                (message "hx-arg: 'f3")
-                                (setq hx-arg-next 'f3
-                                      hx-arg-persist t))))
-    ([f4] . ("hx-arg f4" . ,(hx :eval
-                                (message "hx-arg: 'f4")
-                                (setq hx-arg-next 'f4
-                                      hx-arg-persist t))))
-    ;; major-mode specific command
-    ("'x" . ,(hx :region :let (command (lookup-key (current-local-map) (kbd "C-c C-c")))
-               :eval (when command (call-interactively command))))))
+    ("SPC a" . ("ai" . (keymap)))
+    ("SPC a c" . ("ai code actions" . (keymap)))
+    ("SPC a c c" . ("code complete" . ,(hx :region :eval ellama-code-complete)))
+    ("SPC a c a" . ("code add" . ,(hx :region :eval ellama-code-add)))
+    ("SPC a c e" . ("code edit" . ,(hx :region :eval ellama-code-edit)))
+    ("SPC a c i" . ("code improve" . ,(hx :region :eval ellama-code-improve)))
+    ("SPC a c r" . ("code review" . ,(hx :region :eval ellama-code-review)))
+    ("SPC a s" . ("ai summarize" . (keymap)))
+    ("SPC a s s" . ("summarize" . ,(hx :region :eval ellama-summarize)))
+    ("SPC a s w" . ("summarize webpage" . ,(hx :region :eval ellama-summarize-webpage)))
+    ("SPC a i" . ("ai improve" . (keymap)))
+    ("SPC a i w" . ("improve wording" . ,(hx :region :eval ellama-improve-wording)))
+    ("SPC a i g" . ("improve grammar" . ,(hx :region :eval ellama-improve-grammar)))
+    ("SPC a i c" . ("improve conciseness" . ,(hx :region :eval ellama-improve-conciseness)))
+    ("SPC a a" . ("ai ask" . (keymap)))
+    ("SPC a a a" . ("ask about" . ,(hx :region :eval ellama-ask-about)))
+    ("SPC a a i" . ("ask interactively" . ,(hx :region :eval ellama-chat)))
+    ("SPC a a s" . ("ask selection" . ,(hx :region :eval ellama-ask-selection)))
+    ("SPC a t" . ("ai text actions" . (keymap)))
+    ("SPC a t t" . ("text translate" . ,(hx :region :eval ellama-translate)))
+    ("SPC a t c" . ("text complete" . ,(hx :region :eval ellama-complete)))))
 
 (modaled-define-keys
   :states '("insert")
   :bind
-  `((,(kbd "M-i") . ("code suggestion (LSP)" . company-manual-begin))
+  `(("M-i" . ("code suggestion (LSP)" . company-manual-begin))
     ;; set tempo-match-finder temporarily to prevent conflicts
-    (,(kbd "M-t") . ("tempo complete" . ,(hx :let (tempo-match-finder my-tempo-match-finder) :eval tempo-complete-tag)))))
+    ("M-t" . ("tempo complete" . ,(hx :let (tempo-match-finder my-tempo-match-finder) :eval tempo-complete-tag)))))
 
 (modaled-define-keys
   :states '("insert")
   :keymaps '(minibuffer-mode-map)
   :bind
   ;; this makes pasting work in GUI
-  `((,(kbd "C-w") . ("delete word backward" . hx-delete-word-backward))
-    (,(kbd "C-u") . ("delete line" . hx-delete-line))
+  `(("C-w" . ("delete word backward" . hx-delete-word-backward))
+    ("C-u" . ("delete line" . hx-delete-line))
     ;; In terminal C-S-v is <xterm-paste>
     ;; Note: C-S-v conflicts with M-[ in terminal
-    ((,(kbd "C-S-v") [xterm-paste]) . ("paste from clipboard" . ,(hx :eval (insert (xclip-get-selection 'clipboard)))))))
+    (("C-S-v" "<xterm-paste>") . ("paste from clipboard" . ,(hx :eval (insert (xclip-get-selection 'clipboard)))))))
 
 (defun hx-save ()
   "Save buffer or finish editing."
@@ -1259,41 +1281,47 @@ Should be called only before entering multiple-cursors-mode."
 
 ;; common keybindings for all states
 (modaled-define-keys
-  :states '("normal" "select" "insert")
+  :states '("normal" "select" "insert" "major")
   :bind
-  `(([escape] . ("main state" . ,(hx :eval modaled-set-main-state hx-format-blank-line hx-no-sel)))
-    (,(kbd "M-SPC") . ("toggle vterm" . vterm-toggle))
-    (,(kbd "M-h") . ("split horizontally" . ,(hx :eval split-window-horizontally other-window)))
-    (,(kbd "M-v") . ("split vertically" . ,(hx :eval split-window-vertically other-window)))
-    (,(kbd "M-q") . ("delete window" . delete-window))
-    (,(kbd "M-j") . ("left window" . windmove-left))
-    (,(kbd "M-;") . ("right window" . windmove-right))
-    (,(kbd "M-l") . ("up window" . windmove-up))
-    (,(kbd "M-k") . ("down window" . windmove-down))
-    (,(kbd "C-M-j") . ("shrink window horizontally" . shrink-window-horizontally))
-    (,(kbd "C-M-;") . ("enlarge window horizontally" . enlarge-window-horizontally))
-    (,(kbd "C-M-l") . ("enlarge window vertically" . enlarge-window))
-    (,(kbd "C-M-k") . ("shrink window vertically" . shrink-window))
-    (,(kbd "C-s") . ("save" . hx-save))
-    (,(kbd "C-a") . ("abort" . hx-abort))
-    (,(kbd "C-q") . ("quit" . save-buffers-kill-terminal))))
+  `(("<escape>" . ("main state" . ,(hx :eval modaled-set-main-state hx-format-blank-line hx-no-sel)))
+    ("M-SPC" . ("toggle vterm" . vterm-toggle))
+    ("M-h" . ("split horizontally" . ,(hx :eval split-window-horizontally other-window)))
+    ("M-v" . ("split vertically" . ,(hx :eval split-window-vertically other-window)))
+    ("M-q" . ("delete window" . delete-window))
+    ("M-j" . ("left window" . windmove-left))
+    ("M-;" . ("right window" . windmove-right))
+    ("M-l" . ("up window" . windmove-up))
+    ("M-k" . ("down window" . windmove-down))
+    ("M-J" . ("shrink window horizontally" . shrink-window-horizontally))
+    ("M-:" . ("enlarge window horizontally" . enlarge-window-horizontally))
+    ("M-L" . ("enlarge window vertically" . enlarge-window))
+    ("M-K" . ("shrink window vertically" . shrink-window))
+    ("C-M-j" . ("prev tab" . centaur-tabs-backward))
+    ("C-M-;" . ("next tab" . centaur-tabs-forward))
+    ("C-M-l" . ("prev tab group" . centaur-tabs-backward-group))
+    ("C-M-k" . ("next tab group" . centaur-tabs-forward-group))
+    ("C-s" . ("save" . hx-save))
+    ("C-M-s" . ("save all" . ,(hx :eval (save-some-buffers t))))
+    ("C-a" . ("abort" . hx-abort))
+    ("C-q" . ("quit" . save-buffers-kill-terminal))))
 
 (modaled-define-keys
   :global t
   :bind
-  `(([escape] . ("keyboard quit" . keyboard-escape-quit))
+  `(("<escape>" . ("keyboard quit" . keyboard-escape-quit))
     ;; only works in GUI as C-= and C-- are managed by terminal emulator otherwise
-    (,(kbd "C-=") . ("scale increase" . text-scale-increase))
-    (,(kbd "C--") . ("scale decrease" . text-scale-decrease))
-    ((,(kbd "C-d")
-      ;; unset it to prevent conflict with M-<mouse-1>
-      ,(kbd "M-<down-mouse-1>")) . nil)))
+    ("C-=" . ("scale increase" . text-scale-increase))
+    ("C--" . ("scale decrease" . text-scale-decrease))
+    ;; unset M-<down-mouse-1> to prevent conflict with M-<mouse-1>
+    (("C-d" "M-<down-mouse-1>") . nil)))
 
 (setq modaled-init-state-fn
       (lambda ()
         (cond
          ((memq major-mode '(vterm-mode xeft-mode))
           "insert")
+         ((memq major-mode '(dired-mode dired-sidebar-mode))
+          "major")
          (t "normal"))))
 (setq modaled-main-state-fn
       (lambda ()

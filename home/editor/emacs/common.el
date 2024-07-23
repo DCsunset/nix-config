@@ -7,7 +7,6 @@
 (menu-bar-mode -1)
 (scroll-bar-mode -1)
 (blink-cursor-mode -1)
-(column-number-mode 1)
 (electric-pair-mode 1)  ; auto complete pair
 (setq-default visible-cursor nil ; for non-blinking cursor in console
               help-window-select t  ; always select help window to close it easily
@@ -51,16 +50,8 @@
             nerd-icons-octicon
             nerd-icons-devicon))
 
-(use-package modaled
-  :commands (modaled-setup
-             modaled-set-state
-             modaled-define-keys
-             modaled-define-state-keys
-             modaled-set-init-state
-             modaled-set-main-state
-             modaled-define-substate-keys
-             modaled-get-substate-mode
-             modaled-enable-substate-on-state-change))
+(use-package modaled)
+
 (defun modaled-set-insert-state ()
   "Set insert modaled state."
   (interactive)

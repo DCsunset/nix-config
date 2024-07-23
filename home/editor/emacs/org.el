@@ -141,7 +141,15 @@ LOC can be `current' or `other'."
              org-agenda-priority
              org-agenda-refile)
   :config
-  (setf (cdr (assoc 'todo org-agenda-prefix-format)) " %i %-16:c ")
+  (defun my-org-agenda-prefix ()
+    "Prefix string for org agenda items."
+    (concat
+     (s-truncate
+      19
+      (s-join "/" (remove nil `(,(org-get-category) ,(nth 1 (org-get-outline-path)))))
+      "..")
+     ":"))
+  (setf (cdr (assoc 'todo org-agenda-prefix-format)) " %i %-20(my-org-agenda-prefix) ")
   (setq org-agenda-files
         `(,(gtd-file "inbox.org")
           ,(gtd-file "actions.org"))))
@@ -222,27 +230,27 @@ LOC can be `current' or `other'."
 (modaled-define-keys
   :substates '("org")
   :bind
-  `((,(kbd "M-RET") . ("org open (other window)" . ,(hx :eval (org-open 'other))))
-    (,(kbd "RET") . ("org open" . ,(hx :eval (org-open 'current))))
-    ("'w" . ("org edit" . org-edit-special))
-    ("'e" . ("org export" . org-export-dispatch))
-    ("'it" . ("org insert template" . ,(hx :eval
+  `(("M-RET" . ("org open (other window)" . ,(hx :eval (org-open 'other))))
+    ("RET" . ("org open" . ,(hx :eval (org-open 'current))))
+    ("' w" . ("org edit" . org-edit-special))
+    ("' e" . ("org export" . org-export-dispatch))
+    ("' i t" . ("org insert template" . ,(hx :eval
                                          (modaled-set-state "insert")
                                          org-insert-structure-template)))
-    ("'ii" . ("org insert id" . org-id-get-create))
-    ("'ic" . ("org insert category" . org-insert-category))
-    ("'l" . ("org toggle link display" . org-toggle-link-display))
-    ("'c" . ("org capture" . org-capture))
-    ("'<" . ("org promote" . ,(hx :region :eval org-do-promote)))
-    ("'>" . ("org demote" . ,(hx :region :eval org-do-demote)))
-    ("'J" . ("org promote subtree" . ,(hx :region :eval org-promote-subtree)))
-    ("':" . ("org demote subtree" . ,(hx :region :eval org-demote-subtree)))
-    ("'L" . ("org promote subtree" . ,(hx :region :eval org-move-subtree-up)))
-    ("'K" . ("org demote subtree" . ,(hx :region :eval org-move-subtree-down)))
+    ("' i i" . ("org insert id" . org-id-get-create))
+    ("' i c" . ("org insert category" . org-insert-category))
+    ("' l" . ("org toggle link display" . org-toggle-link-display))
+    ("' c" . ("org capture" . org-capture))
+    ("' <" . ("org promote" . ,(hx :region :eval org-do-promote)))
+    ("' >" . ("org demote" . ,(hx :region :eval org-do-demote)))
+    ("' J" . ("org promote subtree" . ,(hx :region :eval org-promote-subtree)))
+    ("' :" . ("org demote subtree" . ,(hx :region :eval org-demote-subtree)))
+    ("' L" . ("org promote subtree" . ,(hx :region :eval org-move-subtree-up)))
+    ("' K" . ("org demote subtree" . ,(hx :region :eval org-move-subtree-down)))
     ;; org-gtd
-    ("'t" . ("org todo" . ,(hx :region :eval org-todo gtd-save)))
-    ("'r" . ("org refile" . ,(hx :region :eval org-refile gtd-save)))
-    ("'p" . ("org priority" . ,(hx :region :eval org-priority gtd-save)))))
+    ("' t" . ("org todo" . ,(hx :region :eval org-todo gtd-save)))
+    ("' r" . ("org refile" . ,(hx :region :eval org-refile gtd-save)))
+    ("' p" . ("org priority" . ,(hx :region :eval org-priority gtd-save)))))
 ;; enable org substate only for org-mode & not insert state
 (modaled-enable-substate-on-state-change
   "org"
@@ -255,9 +263,9 @@ LOC can be `current' or `other'."
   :substates '("org-agenda")
   :bind
   `(("r" . ("rebuild agenda view" . org-agenda-redo))
-    ("'t" . ("org todo" . ,(hx :eval org-agenda-todo gtd-save)))
-    ("'p" . ("org priority" . ,(hx :eval org-agenda-priority gtd-save)))
-    ("'r" . ("org refile" . ,(hx :eval org-agenda-refile gtd-save)))))
+    ("' t" . ("org todo" . ,(hx :eval org-agenda-todo gtd-save)))
+    ("' p" . ("org priority" . ,(hx :eval org-agenda-priority gtd-save)))
+    ("' r" . ("org refile" . ,(hx :eval org-agenda-refile gtd-save)))))
 (modaled-enable-substate-on-state-change
   "org-agenda"
   :states '("normal" "select")

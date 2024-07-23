@@ -2,6 +2,10 @@
 
 (setq-default delete-by-moving-to-trash t)
 
+;; direnv
+(use-package envrc
+  :hook (after-init . envrc-global-mode))
+
 (use-package openwith
   :commands (openwith-make-extension-regexp
             openwith-mode)
@@ -77,41 +81,43 @@
       "exec nohup " cmd " "
       (mapconcat 'shell-quote-argument files " ")))))
 
-;; dired mode
+;; dired mode (used with major state)
 (modaled-define-substate "dired")
 (modaled-define-keys
   :substates '("dired")
+  :inherit
+  `((modaled-normal-state-keymap . ("l" "k" "L" "K" "C-l" "C-k" "g")))
   :bind
-  `(("'w" . ("toggle wdired (read-only) mode" . dired-toggle-read-only))
-    ("'i" . ("toggle details" . dired-hide-details-mode))
-    ("'h" . ("toggle hidden files" . dired-omit-mode))
-    ("'m" . ("mark" . ,(hx :region :eval dired-mark)))
-    (,(kbd "' M-m") . ("mark by regexp" . dired-mark-files-regexp))
-    ("'M" . ("toggle all marks" . dired-toggle-marks))
-    ("'u" . ("unmark" . ,(hx :region :eval dired-unmark)))
-    ("'U" . ("unmark all" . dired-unmark-all-marks))
-    ("'d" . ("delete" . dired-do-delete))
-    ("'D" . ("delete permanently" . ,(hx :let (delete-by-moving-to-trash nil) :eval dired-do-delete)))
-    ("'k" . ("kill (hide)" . dired-do-kill-lines))
-    ("'y" . ("copy" . dired-do-copy))
-    ("'r" . ("rename" . dired-do-rename))
-    ("'nf" . ("new file" . dired-create-empty-file))
-    ("'nd" . ("new dir" . dired-create-directory))
-    ;; run ! or & to open them separately
-    ("'o" . ("open (in one command)" . dired-open-marked))
-    ("'cm" . ("chmod" . dired-do-chmod))
-    ("'co" . ("chown" . dired-do-chown))
-    ("'cg" . ("chgrp" . dired-do-chgrp))
-    ("'ct" . ("touch" . dired-do-touch))
-    ;; DEL is backspace
-    (("<" ,(kbd "DEL")) . ("go to parent" . dired-up-directory))
+  `((("j" "DEL") . ("go to parent" . dired-up-directory))
     ;; TAB is also supported in `hx-toggle-visibility'
-    ((">" ,(kbd "RET")) . ("open" . dired-find-file))
-    (,(kbd "M-RET") . ("open (other window)" . dired-find-file-other-window))))
+    ((";" "RET") . ("open" . dired-find-file))
+    ("i" . ("toggle details" . dired-hide-details-mode))
+    ("h" . ("toggle hidden files" . dired-omit-mode))
+    ("m" . ("mark" . ,(hx :region :eval dired-mark)))
+    ("M-m" . ("mark by regexp" . dired-mark-files-regexp))
+    ("M" . ("toggle all marks" . dired-toggle-marks))
+    ("u" . ("unmark" . ,(hx :region :eval dired-unmark)))
+    ("U" . ("unmark all" . dired-unmark-all-marks))
+    ("d" . ("delete" . dired-do-delete))
+    ("D" . ("delete permanently" . ,(hx :let (delete-by-moving-to-trash nil) :eval dired-do-delete)))
+    ("H" . ("kill (hide)" . dired-do-kill-lines))
+    ("y" . ("copy" . dired-do-copy))
+    ("r" . ("rename" . dired-do-rename))
+    ("R" . ("replace" . dired-do-find-regexp-and-replace))
+    ("n f" . ("new file" . dired-create-empty-file))
+    ("n d" . ("new dir" . dired-create-directory))
+    ("c m" . ("chmod" . dired-do-chmod))
+    ("c o" . ("chown" . dired-do-chown))
+    ("c g" . ("chgrp" . dired-do-chgrp))
+    ("c t" . ("touch" . dired-do-touch))
+    ;; run ! or & to open them separately
+    ("o" . ("open (in one command)" . dired-open-marked))
+    ("' w" . ("toggle wdired (read-only) mode" . dired-toggle-read-only))
+    ("M-RET" . ("open (other window)" . dired-find-file-other-window))))
 (modaled-enable-substate-on-state-change
   "dired"
-  :states '("normal" "select")
-  :major '(dired-mode wdired-mode dired-sidebar-mode))
+  :states '("major")
+  :major '(dired-mode dired-sidebar-mode))
 
 (defun dired-highlight ()
   "Highlight line for Dired."

@@ -192,6 +192,12 @@
   ;; use margin mode to support terminal emacs
   (diff-hl-margin-mode 1))
 
+;;; inline git blame
+(use-package blamer
+  :custom
+  (blamer-idle-time 0.2)
+  (blamer-min-offset 70))
+
 (use-package magit
   :commands (magit-status
              with-editor-finish
@@ -253,7 +259,7 @@
   :substates '("vterm-insert")
   ; pass keys to terminal
   :bind
-  `(((,(kbd "C-w") ,(kbd "C-u") ,(kbd "C-c")) . ("passthrough" . vterm--self-insert))))
+  `((("C-w" "C-u" "C-c") . ("passthrough" . vterm--self-insert))))
 ;; enable substate only for vterm-mode & not insert state
 (modaled-enable-substate-on-state-change
   "vterm"
@@ -298,7 +304,7 @@
     ("l" . ("up" . vundo-previous))
     ("w" . ("next fork" . vundo-stem-root))
     ("b" . ("previous fork". vundo-next-root))
-    ("g;" . ("end". vundo-stem-end))
+    ("g ;" . ("end". vundo-stem-end))
     ("m" . ("mark". vundo-diff-mark))
     ("u" . ("unmark". vundo-diff-unmark))
     ("d" . ("diff". vundo-diff))
