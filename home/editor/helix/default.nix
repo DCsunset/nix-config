@@ -16,6 +16,8 @@ with lib;
         commonKeys = {
           C-s = ":w";
           C-q = ":q";
+          "C-;" = "goto_next_buffer";
+          C-j = "goto_previous_buffer";
         };
         nonInsertKeys = {
           # goto mode
@@ -79,14 +81,12 @@ with lib;
             ";" = "move_char_right";
             K = "move_line_down";
             L = "move_line_up";
-            C-j = replicate 10 "move_char_left";
-            C-k = replicate 10 "move_visual_line_down";
-            C-l = replicate 10 "move_visual_line_up";
-            "C-;" = replicate 10 "move_char_right";
+            C-u = replicate 10 "move_visual_line_up";
+            C-d = replicate 10 "move_visual_line_down";
           }
         ];
 
-        select = mylib.recursiveMergeAttrs [
+        select = dc-lib.recursiveMergeAttrs [
           commonKeys
           nonInsertKeys
           {
@@ -96,14 +96,12 @@ with lib;
             ";" = "extend_char_right";
             K = "extend_line_down";
             L = "extend_line_up";
-            C-j = replicate 10 "extend_char_left";
-            C-k = replicate 10 "extend_visual_line_down";
-            C-l = replicate 10 "extend_visual_line_up";
-            "C-;" = replicate 10 "extend_char_right";
+            C-u = replicate 10 "extend_visual_line_up";
+            C-d = replicate 10 "extend_visual_line_down";
           }
         ];
 
-        insert = mylib.recursiveMergeAttrs [
+        insert = dc-lib.recursiveMergeAttrs [
           commonKeys
           {
             A-i = "completion";
