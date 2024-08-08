@@ -1004,13 +1004,9 @@ Should be called only before entering multiple-cursors-mode."
     ("k" . ("down (visual)" . ,(hx :re-sel :eval next-line)))
     ("L" . ("up (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval previous-line)))
     ("K" . ("down (text)" . ,(hx :let (line-move-visual nil) :re-sel :eval next-line)))
-    ("C-j" . ("left 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
-                                       (funcall-interactively #'backward-char (* (car l-args) 10)))))
-    ("C-;" . ("right 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
-                                        (funcall-interactively #'forward-char (* (car l-args) 10)))))
-    ("C-l" . ("up 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
+    ("C-u" . ("up 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                      (funcall-interactively #'previous-line (* (car l-args) 10)))))
-    ("C-k" . ("down 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
+    ("C-d" . ("down 10x (visual)" . ,(hx :arg-desc "p" :re-sel :eval
                                        (funcall-interactively #'next-line (* (car l-args) 10)))))
     ("w" . ("next word" . ,(hx :re-hl :eval (hx-next-word (equal modaled-state "normal")))))
     ("b" . ("prev word" . ,(hx :re-hl :eval (hx-previous-word (equal modaled-state "normal")))))
@@ -1110,8 +1106,6 @@ Should be called only before entering multiple-cursors-mode."
     (("TAB" "<tab>") . ("toggle visibility" . hx-toggle-visibility))
     ("|" . ("expr eval" . eval-expression))
     ("\\" . ("eval region" . ,(hx :eval (hx-region-apply #'eval-region t))))
-    ("q" . ("quit window" . quit-window))
-    ("Q" . ("kill buffer" . kill-this-buffer))
     ;; hx-arg
     ("<f1>" . ("hx-arg f1" . ,(hx :eval
                                 (message "hx-arg: 'f1")
@@ -1137,7 +1131,9 @@ Should be called only before entering multiple-cursors-mode."
 (modaled-define-keys
   :states '("normal" "select" "major")
   :bind
-  `(("SPC '" . ("Toggle major state" . ,(hx :eval (modaled-set-state
+  `(("q" . ("quit window" . quit-window))
+    ("Q" . ("kill buffer" . kill-this-buffer))
+    ("SPC '" . ("Toggle major state" . ,(hx :eval (modaled-set-state
                                                 (if (equal modaled-state "major")
                                                     "normal"
                                                   "major")))))
@@ -1257,8 +1253,8 @@ Should be called only before entering multiple-cursors-mode."
     (org-capture-finalize))
    ((eq major-mode 'wdired-mode)
     (wdired-finish-edit)
-    ;; re-highlighting (note mode hook won't be called for some reason)
-    (dired-highlight))
+    ;; force initialization as major-mode hook is not called
+    (modaled-initialize t))
    ((or (bound-and-true-p git-commit-mode)
         (eq major-mode 'git-rebase-mode))
     (call-interactively #'with-editor-finish))
@@ -1274,7 +1270,7 @@ Should be called only before entering multiple-cursors-mode."
     (wdired-abort-changes)
     ;; reload buffer to fix icons
     (revert-buffer)
-    (dired-highlight))
+    (modaled-initialize t))
    ((or (bound-and-true-p git-commit-mode)
         (eq major-mode 'git-rebase-mode))
     (call-interactively #'with-editor-cancel))))
@@ -1283,8 +1279,7 @@ Should be called only before entering multiple-cursors-mode."
 (modaled-define-keys
   :states '("normal" "select" "insert" "major")
   :bind
-  `(("<escape>" . ("main state" . ,(hx :eval modaled-set-main-state hx-format-blank-line hx-no-sel)))
-    ("M-SPC" . ("toggle vterm" . vterm-toggle))
+  `(("M-SPC" . ("toggle vterm" . vterm-toggle))
     ("M-h" . ("split horizontally" . ,(hx :eval split-window-horizontally other-window)))
     ("M-v" . ("split vertically" . ,(hx :eval split-window-vertically other-window)))
     ("M-q" . ("delete window" . delete-window))
@@ -1296,14 +1291,25 @@ Should be called only before entering multiple-cursors-mode."
     ("M-:" . ("enlarge window horizontally" . enlarge-window-horizontally))
     ("M-L" . ("enlarge window vertically" . enlarge-window))
     ("M-K" . ("shrink window vertically" . shrink-window))
-    ("C-M-j" . ("prev tab" . centaur-tabs-backward))
-    ("C-M-;" . ("next tab" . centaur-tabs-forward))
-    ("C-M-l" . ("prev tab group" . centaur-tabs-backward-group))
-    ("C-M-k" . ("next tab group" . centaur-tabs-forward-group))
+    ("C-j" . ("prev tab" . centaur-tabs-backward))
+    ("C-;" . ("next tab" . centaur-tabs-forward))
+    ("C-l" . ("prev tab group" . centaur-tabs-backward-group))
+    ("C-k" . ("next tab group" . centaur-tabs-forward-group))
     ("C-s" . ("save" . hx-save))
     ("C-M-s" . ("save all" . ,(hx :eval (save-some-buffers t))))
     ("C-a" . ("abort" . hx-abort))
     ("C-q" . ("quit" . save-buffers-kill-terminal))))
+
+(modaled-define-keys
+  :states '("select" "insert")
+  :bind
+  `(("<escape>" . ("main state" . ,(hx :eval modaled-set-main-state hx-format-blank-line hx-no-sel)))))
+
+;; ignore escape to prevent using global map
+(modaled-define-keys
+  :states '("normal" "major")
+  :bind
+  `(("<escape>" . ignore)))
 
 (modaled-define-keys
   :global t

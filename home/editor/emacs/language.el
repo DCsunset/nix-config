@@ -1,7 +1,9 @@
 :;; language related config
 
 ;;; editor config
-;; Use setq-default because many variables are buffer-local
+;; mode for *scratch* buffer
+(setq initial-major-mode 'text-mode)
+;; Use setq-default because these variables are buffer-local
 (setq-default major-mode 'text-mode  ; use text-mode by default instead of fundamental-mode
               indent-tabs-mode nil  ; use spaces for indentation
               standard-indent 2

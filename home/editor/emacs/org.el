@@ -263,9 +263,9 @@ LOC can be `current' or `other'."
   :substates '("org-agenda")
   :bind
   `(("r" . ("rebuild agenda view" . org-agenda-redo))
-    ("' t" . ("org todo" . ,(hx :eval org-agenda-todo gtd-save)))
-    ("' p" . ("org priority" . ,(hx :eval org-agenda-priority gtd-save)))
-    ("' r" . ("org refile" . ,(hx :eval org-agenda-refile gtd-save)))))
+    ("' t" . ("org todo" . ,(hx :region :eval org-agenda-todo gtd-save)))
+    ("' p" . ("org priority" . ,(hx :region :eval org-agenda-priority gtd-save)))
+    ("' r" . ("org refile" . ,(hx :region :eval org-agenda-refile gtd-save)))))
 (modaled-enable-substate-on-state-change
   "org-agenda"
   :states '("normal" "select")

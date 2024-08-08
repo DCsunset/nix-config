@@ -29,7 +29,7 @@
           (,(openwith-make-extension-regexp
              '("mp3" "flac" "aac" "wav"
                "mp4" "mkv" "mpe?g" "flv" "avi" "wmv"))
-           "mpv"
+           "mpv --force-window=immediate"
            (file))))
   (setq large-file-warning-threshold nil))
 
@@ -112,7 +112,8 @@
     ("c t" . ("touch" . dired-do-touch))
     ;; run ! or & to open them separately
     ("o" . ("open (in one command)" . dired-open-marked))
-    ("' w" . ("toggle wdired (read-only) mode" . dired-toggle-read-only))
+    ;; use C-s or C-a to exit wdired mode
+    ("' w" . ("enable wdired mode" . dired-toggle-read-only))
     ("M-RET" . ("open (other window)" . dired-find-file-other-window))))
 (modaled-enable-substate-on-state-change
   "dired"
@@ -125,8 +126,9 @@
                       modaled-dired-substate-mode)))
     (hl-line-mode (if enabled 1 -1))))
 
-(add-hook 'modaled-dired-substate-mode-hook
-          #'dired-highlight)
+;; The major mode hook won't run when changing from wdired-mode to dired-mode
+;; Must use minor mode hook (with modaled-initialize)
+(add-hook 'modaled-dired-substate-mode-hook #'dired-highlight)
 
 (use-package dired-sidebar
   :commands (dired-sidebar-toggle-sidebar

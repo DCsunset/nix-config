@@ -199,19 +199,28 @@
   (blamer-min-offset 70))
 
 (use-package magit
-  :commands (magit-status
-             with-editor-finish
-             with-editor-cancel)
   :hook
   (magit-pre-refresh . diff-hl-magit-pre-refresh)
   (magit-post-refresh . diff-hl-magit-post-refresh)
   ;; refresh magit after saving buffer
   (after-save . magit-after-save-refresh-status)
-  (git-commit-mode . modaled-set-insert-state))
+  (git-commit-mode . modaled-set-insert-state)
+  :config
+  ;; always show recent & unpushed commits
+  (magit-add-section-hook 'magit-status-sections-hook
+                          #'magit-insert-unpushed-to-upstream
+                          #'magit-insert-unpushed-to-upstream-or-recent)
+  (magit-add-section-hook 'magit-status-sections-hook
+                          #'magit-insert-recent-commits
+                          #'magit-insert-unpushed-to-upstream-or-recent
+                          'replace)
+  ;; always expand untracked & recent commits section
+  (setf (alist-get 'recent magit-section-initial-visibility-alist) 'show)
+  (setf (alist-get 'untracked magit-section-initial-visibility-alist) 'show))
 
 (use-package magit-todos
-  :commands magit-todos-mode
-  :init
+  :after magit
+  :config
   (magit-todos-mode 1))
 
 ;; magit-status-mode specific keybindings
