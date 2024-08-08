@@ -1,4 +1,4 @@
-{ config, lib, mylib, ... }:
+{ config, lib, dc-lib, ... }:
 
 with lib;
 {
@@ -69,7 +69,7 @@ with lib;
           A-s = "save_selection";
         };
       in {
-        normal = mylib.recursiveMergeAttrs [
+        normal = dc-lib.recursiveMergeAttrs [
           commonKeys
           nonInsertKeys
           {

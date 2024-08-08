@@ -18,7 +18,7 @@ in
     homeConfigurations.${cfg.user} = home-manager.lib.homeManagerConfiguration {
       pkgs = import nixpkgs { inherit (cfg) system; };
       extraSpecialArgs = {
-        mylib = import ./lib { inherit (nixpkgs) lib; };
+        dc-lib = nur-dcsunset.lib;
 
         modules = [
           {

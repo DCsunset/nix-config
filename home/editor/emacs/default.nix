@@ -1,4 +1,4 @@
-{ config, pkgs, lib, mylib, ... }:
+{ config, pkgs, lib, dc-lib, ... }:
 
 {
   programs.emacs = {
@@ -117,7 +117,7 @@
       builtins.replaceStrings
         [ "@lua-language-server-config@" ]
         [ "${./lsp-config}/lua-language-server-config.lua" ]
-        (mylib.readFiles [
+        (dc-lib.readFiles [
           ./common.el
           ./hx.el
           ./modeline.el

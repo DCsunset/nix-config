@@ -1,7 +1,7 @@
-{ pkgs, mylib, ... }:
+{ pkgs, dc-lib, ... }:
 
 {
-  imports = mylib.importSubdirs ./.;
+  imports = dc-lib.importSubdirs ./.;
 
   home.packages = with pkgs; [
     nodePackages.cspell
