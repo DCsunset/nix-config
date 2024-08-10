@@ -77,16 +77,16 @@
         command = "removeSecondaryCursors";
       }
       {
-        key = "alt+[";
+        key = "alt+space";
         command = "workbench.action.togglePanel";
       }
       {
-        key = "alt+]";
+        key = "alt+k";
         command = "workbench.action.terminal.focus";
         when = "!terminalFocus";
       }
       {
-        key = "alt+]";
+        key = "alt+l";
         command = "workbench.action.focusActiveEditorGroup";
         when = "terminalFocus";
       }
@@ -103,16 +103,6 @@
       {
         key = "ctrl+e";
         command = "-workbench.action.quickOpen";
-      }
-      {
-        key = "ctrl+i";
-        command = "workbench.action.navigateForward";
-        when = "editorTextFocus";
-      }
-      {
-        key = "ctrl+o";
-        command = "workbench.action.navigateBack";
-        when = "editorTextFocus";
       }
       {
         key = "ctrl+w";
@@ -138,12 +128,20 @@
 
       # vscode-modal-editor
       {
-        key = "ctrl+l";
+        key = "ctrl+u";
         command = "modalEditor.halfPageUp";
       }
       {
-        key = "ctrl+k";
+        key = "ctrl+d";
         command = "modalEditor.halfPageDown";
+      }
+      {
+        key = "ctrl+j";
+        command = "workbench.action.previousEditor";
+      }
+      {
+        key = "ctrl+;";
+		    command = "workbench.action.nextEditor";
       }
       {
         key = "enter";

@@ -69,8 +69,13 @@ module.exports = {
 				before: true
 			}
 		}),
-		"`": "modalEditor.toLowerCase",
-		"~": "modalEditor.toUpperCase",
+		"`": {
+      c: {
+        l: "modalEditor.toLowerCase",
+		    u: "modalEditor.toUpperCase"
+      }
+    },
+
 		// Replace selections
 		r: {
 			// Wildcard character
@@ -84,6 +89,9 @@ module.exports = {
 				}`
 			}
 		},
+
+    "[": "workbench.action.navigateBack",
+    "]": "workbench.action.navigateForward",
 
 		// into command mode
 		":": "modalEditor.setCommandMode",
@@ -152,8 +160,6 @@ module.exports = {
 			e: "cursorBottom",
 			k: "cursorBottom",
 			".": "workbench.action.navigateToLastEditLocation",
-			p: "workbench.action.previousEditor",
-			n: "workbench.action.nextEditor",
 			d: "editor.action.revealDefinition"
 		},
 
