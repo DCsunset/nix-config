@@ -1,14 +1,13 @@
-{ ... }:
+{ pkgs, dc-lib, ... }:
 
-let
-  cfg = import ./config.nix;
-in
 {
-  home.username = cfg.user;
-  home.homeDirectory = "/home/${cfg.user}";
-  home.stateVersion = "24.11";
+  imports = dc-lib.importSubdirs ./home;
 
-  programs.home-manager.enable = true;
-
-  imports = [ ./home ];
+  home.packages = with pkgs; [
+    nodePackages.cspell
+    xclip
+    (python3.withPackages (ps: with ps; [
+      matplotlib
+    ]))
+  ];
 }
