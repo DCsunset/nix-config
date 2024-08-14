@@ -2,7 +2,7 @@
   programs.zsh = {
     enable = true;
     # fish-like autosuggestion
-    enableAutosuggestions = true;
+    autosuggestion.enable = true;
     # Enable zsh syntax highlighting
     syntaxHighlighting.enable = true;
     # util functions
