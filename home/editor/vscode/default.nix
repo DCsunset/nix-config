@@ -1,7 +1,7 @@
-{ pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
-  programs.vscode = {
+  programs.vscode = lib.mkIf config.custom.gui.enable {
     enable = true;
     package = pkgs.vscodium;
 

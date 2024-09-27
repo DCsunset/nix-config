@@ -3,7 +3,7 @@
 {
   programs.emacs = {
     enable = true;
-    package = with pkgs; emacs29;
+    package = if config.custom.gui.enable then pkgs.emacs30 else pkgs.emacs30-nox;
     # emacs packages
     extraPackages = epkgs: with epkgs; [
       ## common.el
