@@ -5,5 +5,5 @@ My person common Nix config.
 
 ## Usage
 
-Copy `config.nix.example` to `config.nix` and modify the variables.
+Copy `config.example.nix` to `config.nix` and modify the variables.
 
