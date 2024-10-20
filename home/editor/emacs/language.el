@@ -9,7 +9,6 @@
               standard-indent 2
               tab-width 2
               sh-indentation 2
-              nushell-indent-offset 2
               python-indent-offset 2
               css-indent-offset 2
               js-indent-level 2
@@ -36,11 +35,42 @@
 
 (use-package jtsx)
 
+(use-package d2-mode
+  :mode ("\\.d2\\'" . d2-mode)
+  :config
+  (modaled-define-substate "d2")
+  (modaled-define-keys
+    :substates '("d2")
+    :bind
+    `(("' c" . ("d2 compile" . d2-compile))))
+  (modaled-enable-substate-on-state-change
+    "d2"
+    :states '("normal" "select")
+    :major '(d2-mode)))
+
 (use-package markdown-mode
   :mode ("README\\.md\\'" . gfm-mode)
   :init
   (setq markdown-command '("pandoc" "--from=markdown" "--to=html5")))
 
+(use-package nushell-mode
+  :custom
+  (nushell-indent-offset 2))
+
+(use-package typst-ts-mode
+  :custom
+  (typst-ts-mode-indent-offset 2)
+  (typst-ts-mode-enable-raw-blocks-highlight t)
+  :config
+  (modaled-define-substate "typst")
+  (modaled-define-keys
+    :substates '("typst")
+    :bind
+    `(("' m" . ("typst menu" . typst-ts-tmenu))))
+  (modaled-enable-substate-on-state-change
+    "typst"
+    :states '("normal" "select")
+    :major '(typst-ts-mode)))
 
 (use-package combobulate
   :commands (combobulate-navigate-previous
@@ -54,11 +84,6 @@
 
 ;; eglot LSP client
 (use-package eglot
-  :commands (eglot-rename
-             eglot-format
-             eglot-format-buffer
-             eglot-code-actions
-             eglot-code-action-quickfix)
   :hook
   ((haskell-mode
     c-ts-mode
@@ -80,11 +105,14 @@
     dockerfile-ts-mode
     nix-mode
     lua-mode
-    latex-mode) . eglot-ensure)
+    latex-mode
+    typst-ts-mode) . eglot-ensure)
   :custom
   ; disable event buffer (hangs frequently in js/ts)
   (eglot-events-buffer-size 0)
   :config
+  (add-to-list 'eglot-server-programs
+               '(typst-ts-mode . ("tinymist")))
   (add-to-list 'eglot-server-programs
                '(lua-mode . ("lua-language-server" "--configpath=@lua-language-server-config@"))))
 

@@ -106,6 +106,68 @@ Toggle it when ARG is nil or 0."
 (modaled-define-local-var hx--mark nil
   "Start pos of the selected region in hx.")
 
+
+;;; multiple cursors
+
+(defun hx-toggle-multiple-cursors ()
+  "Toggle multiple-cursors-mode."
+  (interactive)
+  (if multiple-cursors-mode
+      (mc/disable-multiple-cursors-mode)
+    (mc/maybe-multiple-cursors-mode)))
+
+(defun hx-toggle-cursor-on-click (event)
+  "Toggle a cursor on mouse click EVENT."
+  (interactive "e")
+  (mouse-minibuffer-check event)
+  ;; Use event-end in case called from mouse-drag-region.
+  ;; If EVENT is a click, event-end and event-start give same value.
+  (let ((position (event-end event)))
+    (if (not (windowp (posn-window position)))
+        (error "Position not in text area of window"))
+    (select-window (posn-window position))
+    (let ((pt (posn-point position)))
+      (if (numberp pt)
+          ;; is there a fake cursor with the actual *point* right where we are?
+          (let ((existing (mc/fake-cursor-at-point pt)))
+            (if existing
+                (mc/remove-fake-cursor existing)
+              (save-excursion
+                (goto-char pt)
+                (mc/create-fake-cursor-at-point))))))))
+
+(defun hx-toggle-cursor ()
+  "Toggle a cursor at point."
+  (interactive)
+  (let ((cursor (mc/fake-cursor-at-point)))
+    (if cursor
+        (mc/remove-fake-cursor cursor)
+      (mc/create-fake-cursor-at-point))))
+
+(defun hx-add-cursor ()
+  "Add a cursor at point if doesn't exist."
+  (interactive)
+  (let ((cursor (mc/fake-cursor-at-point)))
+    (when (not cursor)
+      (mc/create-fake-cursor-at-point))))
+
+(defun hx-remove-cursors ()
+  "Remove all extra cursors.
+Should be called only before entering multiple-cursors-mode."
+  (interactive)
+  (if multiple-cursors-mode
+      (message "multiple-cursors-mode already enabled! Call hx-toggle-multiple-cursors instead")
+    (mc/remove-fake-cursors)))
+
+(use-package multiple-cursors
+  :demand t
+  :config
+  ;; run it once to prevent disabling it immediately after enabling it
+  (add-to-list 'mc--default-cmds-to-run-once #'hx-toggle-multiple-cursors)
+  ;; need to save/restore hx--mark for each cursor
+  (add-to-list 'mc/cursor-specific-vars 'hx--mark))
+
+
 (defun within-range (val range)
   "Test if VAL is within RANGE."
   (and (>= val (car range)) (< val (cdr range))))
@@ -188,18 +250,48 @@ Toggle it when ARG is nil or 0."
       (insert (make-string size char))
       (goto-char pos))))  ; save-excursion won't work as text is changed
 
+(defmacro hx-for-each-cursor-region (&rest forms)
+  "Restore only region-related vars and eval FORMS for each cursor."
+  `(mc/for-each-cursor-ordered
+    (save-excursion
+      (let ((point (overlay-get cursor 'point))
+            (hx--mark (overlay-get cursor 'hx--mark)))
+        (goto-char point)
+        ,@forms))))
+
+(defun hx-selected ()
+  "Get selected text of all cursors."
+  (save-excursion
+    (let ((texts '()))
+      ;; must use it after use-package multiple-cursors
+      (hx-for-each-cursor-region
+       (push (hx-region-apply #'buffer-substring) texts))
+      (string-join (nreverse texts) "\n"))))
+
+(defun hx-copy ()
+  "Copy selection to `kill-ring'."
+  (interactive)
+  (kill-new (hx-selected)))
+
 (defun hx-paste (text direction)
   "Paste TEXT around region (before if DIRECTION is negative and after otherwise)."
-  (let* ((region (hx-region))
-         (pos (if (string-suffix-p "\n" text)
-                  ;; paste in previous or next line if text ends with a newline
-                  (if (< direction 0)
-                      (line-beginning-position)
-                    (line-beginning-position 2))
-                (if (< direction 0) (car region) (cdr region)))))
-    (save-excursion
-      (goto-char pos)
-      (insert text))))
+  (save-excursion
+    (if multiple-cursors-mode
+        (let ((texts (string-split text "\n")))
+          (hx-for-each-cursor-region
+           (let* ((region (hx-region))
+                  (pos (if (< direction 0) (car region) (cdr region))))
+             (goto-char pos)
+             (insert (pop texts)))))
+      (let* ((region (hx-region))
+             (pos (if (string-suffix-p "\n" text)
+                      ;; paste in previous or next line if text ends with a newline
+                      (if (< direction 0)
+                          (line-beginning-position)
+                        (line-beginning-position 2))
+                    (if (< direction 0) (car region) (cdr region)))))
+        (goto-char pos)
+        (insert text)))))
 
 (defun hx-format-blank-line ()
   "Remove whitespaces if this line is empty."
@@ -221,7 +313,7 @@ Toggle it when ARG is nil or 0."
 ;; Used register (symbol):
 ;; - m: motion
 ;; - c: change
-(modaled-define-local-var hx--command-records nil
+(defvar hx--command-records nil
   "Recorded commands.")
 (modaled-define-local-var hx--recorded-keys nil
   "Recorded keys in insert state.")
@@ -895,79 +987,12 @@ AT-POINT means to make sure point is at beg or end."
     (_ (combobulate-kill-node-dwim))))
 
 
-;;; multiple cursors
-
-(defun hx-toggle-multiple-cursors ()
-  "Toggle multiple-cursors-mode."
-  (interactive)
-  (if multiple-cursors-mode
-      (mc/disable-multiple-cursors-mode)
-    (mc/maybe-multiple-cursors-mode)))
-
-(defun hx-toggle-cursor-on-click (event)
-  "Toggle a cursor on mouse click EVENT."
-  (interactive "e")
-  (mouse-minibuffer-check event)
-  ;; Use event-end in case called from mouse-drag-region.
-  ;; If EVENT is a click, event-end and event-start give same value.
-  (let ((position (event-end event)))
-    (if (not (windowp (posn-window position)))
-        (error "Position not in text area of window"))
-    (select-window (posn-window position))
-    (let ((pt (posn-point position)))
-      (if (numberp pt)
-          ;; is there a fake cursor with the actual *point* right where we are?
-          (let ((existing (mc/fake-cursor-at-point pt)))
-            (if existing
-                (mc/remove-fake-cursor existing)
-              (save-excursion
-                (goto-char pt)
-                (mc/create-fake-cursor-at-point))))))))
-
-(defun hx-toggle-cursor ()
-  "Toggle a cursor at point."
-  (interactive)
-  (let ((cursor (mc/fake-cursor-at-point)))
-    (if cursor
-        (mc/remove-fake-cursor cursor)
-      (mc/create-fake-cursor-at-point))))
-
-(defun hx-add-cursor ()
-  "Add a cursor at point if doesn't exist."
-  (interactive)
-  (let ((cursor (mc/fake-cursor-at-point)))
-    (when (not cursor)
-      (mc/create-fake-cursor-at-point))))
-
-(defun hx-remove-cursors ()
-  "Remove all extra cursors.
-Should be called only before entering multiple-cursors-mode."
-  (interactive)
-  (if multiple-cursors-mode
-      (message "multiple-cursors-mode already enabled! Call hx-toggle-multiple-cursors instead")
-    (mc/remove-fake-cursors)))
-
-(use-package multiple-cursors
-  :demand t
-  :commands (mc/maybe-multiple-cursors-mode
-             mc/disable-multiple-cursors-mode
-             mc/create-fake-cursor-at-point
-             mc/remove-fake-cursor
-             mc/fake-cursor-at-point
-             mc/remove-fake-cursors)
-  :config
-  ;; run it once to prevent disabling it immediately after enabling it
-  (add-to-list 'mc--default-cmds-to-run-once #'hx-toggle-multiple-cursors)
-  ;; need to save/restore hx--mark for each cursor
-  (add-to-list 'mc/cursor-specific-vars 'hx--mark))
-
-
 ;;; keybindings
 
 (modaled-define-keys
   :states '("normal")
   :bind
-  `(("v" . ("enable SELECT state" . ,(hx :eval (modaled-set-state "select"))))
+  `(("v" . ("enable SELECT state" . ,(hx :eval (modaled-set-state "select") (hx-set-mark (point)))))
     ;; search (select after search)
     ("/" . ("search forward" . ,(hx :re-hl :eval isearch-forward-regexp backward-char (hx-set-mark isearch-other-end))))
     ("?" . ("search backward" . ,(hx :re-hl :eval isearch-backward-regexp (hx-set-mark (1- isearch-other-end)))))
@@ -976,15 +1001,6 @@ Should be called only before entering multiple-cursors-mode."
     ("*" . ("search selection" . ,(hx :eval (setq isearch-string (hx-region-string)))))
     ("M-/" . ("search lines" . occur))))
 
-(add-hook
- 'modaled-select-state-mode-hook
- (lambda ()
-   ;; (unless (display-graphic-p)
-   ;;   (send-string-to-terminal "\e[2 q"))
-   (unless (equal modaled-state "select")
-     ; entering select state
-     (unless hx--mark
-       (hx-set-mark (point))))))
 (modaled-define-keys
   :states '("select")
   :bind
@@ -1043,11 +1059,11 @@ Should be called only before entering multiple-cursors-mode."
     ("o" . ("insert below" . ,(hx :rec c :eval hx-no-sel (modaled-set-state "insert") end-of-line newline-and-indent)))
     ("O" . ("insert above" . ,(hx :rec c :eval hx-no-sel (modaled-set-state "insert") beginning-of-line newline-and-indent (forward-line -1) indent-according-to-mode)))
     ("r" . ("replace" . ,(hx :rec c :arg (c "Replace: ") :eval modaled-set-main-state (hx-region-replace arg) hx-no-sel)))
-    ("y" . ("copy" . ,(hx :eval modaled-set-main-state (hx-region-apply #'kill-ring-save))))
     ("d" . ("delete" . ,(hx :rec c :eval modaled-set-main-state (hx-region-apply #'delete-region) hx-no-sel)))
     ("c" . ("change" . ,(hx :rec c :eval (modaled-set-state "insert") (hx-region-apply #'delete-region) hx-no-sel)))
-    ("P" . ("paste before" . ,(hx :rec c :eval (hx-paste (current-kill 0 t) -1) hx-no-sel)))
-    ("p" . ("paste after" . ,(hx :rec c :eval (hx-paste (current-kill 0 t) +1) hx-no-sel)))
+    ("y" . ("copy" . ,(hx :once :eval modaled-set-main-state hx-copy)))
+    ("P" . ("paste before" . ,(hx :rec c :once :eval (hx-paste (current-kill 0 t) -1) hx-no-sel)))
+    ("p" . ("paste after" . ,(hx :rec c :once :eval (hx-paste (current-kill 0 t) +1) hx-no-sel)))
     ("M-P" . ("paste before from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") -1) hx-no-sel)))
     ("M-p" . ("paste after from kill-ring)" . ,(hx :eval (hx-paste (read-from-kill-ring "To paste: ") +1) hx-no-sel)))
     ("J" . ("join lines" . hx-join-lines))
@@ -1132,15 +1148,15 @@ Should be called only before entering multiple-cursors-mode."
   :states '("normal" "select" "major")
   :bind
   `(("q" . ("quit window" . quit-window))
-    ("Q" . ("kill buffer" . kill-this-buffer))
+    ("Q" . ("kill buffer" . kill-current-buffer))
     ("SPC '" . ("Toggle major state" . ,(hx :eval (modaled-set-state
                                                 (if (equal modaled-state "major")
                                                     "normal"
                                                   "major")))))
     ("SPC c" . ("clipboard" . (keymap)))
-    ("SPC c P" . ("clipboard paste before" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) -1) hx-no-sel)))
-    ("SPC c p" . ("clipboard paste after" . ,(hx :eval (hx-paste (xclip-get-selection 'clipboard) +1) hx-no-sel)))
-    ("SPC c y" . ("copy to clipboard" . ,(hx :eval modaled-set-main-state (xclip-set-selection 'clipboard (hx-region-string)))))
+    ("SPC c P" . ("clipboard paste before" . ,(hx :once :eval (hx-paste (xclip-get-selection 'clipboard) -1) hx-no-sel)))
+    ("SPC c p" . ("clipboard paste after" . ,(hx :once :eval (hx-paste (xclip-get-selection 'clipboard) +1) hx-no-sel)))
+    ("SPC c y" . ("copy to clipboard" . ,(hx :once :eval modaled-set-main-state (xclip-set-selection 'clipboard (hx-selected)))))
     ("SPC p" . ("projectile" . (keymap)))
     ("SPC p f" . ("find file in project" . projectile-find-file))
     ("SPC p s" . ("search in project" . projectile-ripgrep))
@@ -1175,25 +1191,12 @@ Should be called only before entering multiple-cursors-mode."
                                                 ('f3 '(:note))
                                                 (_ '(:error :warning))))
                                   :eval (flymake-goto-next-error nil types t))))
-    ;; gtd
-    ("SPC t" . ("gtd" . (keymap)))
-    ("SPC t l" . ("gtd list" . org-todo-list))
-    ("SPC t i" . ("gtd inbox" . ,(hx :eval (find-file (gtd-file "inbox.org")))))
-    ("SPC t a" . ("gtd actions" . ,(hx :eval (find-file (gtd-file "actions.org")))))
-    ("SPC t c" . ("gtd capture" . ,(hx :eval (org-capture nil "ti"))))
-    ;; notes (org-roam & xeft)
-    ("SPC n" . ("notes" . (keymap)))
-    ("SPC n f" . ("note find" . org-roam-node-find))
-    ("SPC n s" . ("note search" . xeft))
-    ("SPC n c" . ("note create" . org-roam-capture))
-    ("SPC n i" . ("note insert" . org-roam-node-insert))
-    ("SPC n l" . ("note backlinks" . org-roam-buffer-toggle))
     ;; LSP
     ("SPC l" . ("lsp" . (keymap)))
     ("SPC l r" . ("rename" . eglot-rename))
     ("SPC l =" . ("format" . eglot-format-buffer))
-    ("SPC l a" . ("action" . eglot-code-actions))
-    ("SPC l f" . ("quickfix" . eglot-code-action-quickfix))
+    ("SPC l a" . ("action" . ,(hx :region :eval eglot-code-actions)))
+    ("SPC l f" . ("quickfix" . ,(hx :region :eval eglot-code-action-quickfix)))
     ;; shell
     ("SPC s" . ("shell" . (keymap)))
     ("SPC s x" . ("shell command" . shell-command))
@@ -1225,12 +1228,34 @@ Should be called only before entering multiple-cursors-mode."
     ("SPC a a s" . ("ask selection" . ,(hx :region :eval ellama-ask-selection)))
     ("SPC a t" . ("ai text actions" . (keymap)))
     ("SPC a t t" . ("text translate" . ,(hx :region :eval ellama-translate)))
-    ("SPC a t c" . ("text complete" . ,(hx :region :eval ellama-complete)))))
+    ("SPC a t c" . ("text complete" . ,(hx :region :eval ellama-complete)))
+
+    ;;; apps
+    ("SPC SPC" . ("apps" . (keymap)))
+    ;; gtd
+    ("SPC SPC t" . ("gtd" . (keymap)))
+    ("SPC SPC t l" . ("gtd list" . org-todo-list))
+    ("SPC SPC t i" . ("gtd inbox" . ,(hx :eval (find-file (gtd-file "inbox.org")))))
+    ("SPC SPC t a" . ("gtd actions" . ,(hx :eval (find-file (gtd-file "actions.org")))))
+    ("SPC SPC t n" . ("gtd new" . ,(hx :eval (org-capture nil "ti"))))
+    ;; IRC (ERC)
+    ("SPC SPC i" . ("irc" . ,(hx :eval
+                                 (erc-tls :server "@IRC_SERVER@"
+                                          :port 6697
+                                          :nick "@IRC_NICK@"
+                                          :user "@IRC_USER@"
+                                          :full-name "@IRC_NICK@"
+                                          :password
+                                          (string-trim
+                                           (read-file
+                                            "@IRC_PASS_FILE@"))))))))
 
 (modaled-define-keys
   :states '("insert")
   :bind
-  `(("M-i" . ("code suggestion (LSP)" . company-manual-begin))
+  `((("M-TAB" "M-<tab>") . ("complete" . company-manual-begin))
+    ("M-i" . ("insert" . (keymap)))
+    ("M-i e" . ("insert emoji" . emoji-search))
     ;; set tempo-match-finder temporarily to prevent conflicts
     ("M-t" . ("tempo complete" . ,(hx :let (tempo-match-finder my-tempo-match-finder) :eval tempo-complete-tag)))))
 
@@ -1293,6 +1318,8 @@ Should be called only before entering multiple-cursors-mode."
     ("M-K" . ("shrink window vertically" . shrink-window))
     ("C-j" . ("prev tab" . centaur-tabs-backward))
     ("C-;" . ("next tab" . centaur-tabs-forward))
+    ("C-S-j" . ("prev tab" . centaur-tabs-move-current-tab-to-left))
+    ("C-S-;" . ("prev tab" . centaur-tabs-move-current-tab-to-right))
     ("C-l" . ("prev tab group" . centaur-tabs-backward-group))
     ("C-k" . ("next tab group" . centaur-tabs-forward-group))
     ("C-s" . ("save" . hx-save))

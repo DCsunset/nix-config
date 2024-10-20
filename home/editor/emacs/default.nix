@@ -21,14 +21,15 @@
 
       ## org.el
       org
-      org-roam
-      org-roam-ui
       org-super-agenda
+      denote
+      consult-denote
       pkgs.nur-dcsunset.emacsPackages.org-moderncv
       valign
 
       # language.el
       pkgs.nur-dcsunset.emacsPackages.combobulate
+      pkgs.nur-dcsunset.emacsPackages.typst-ts-mode
       jtsx
       beancount
       nix-mode
@@ -37,56 +38,8 @@
       haskell-mode
       caddyfile-mode
       lua-mode
+      d2-mode
 
-      # modeline.el
-      shrink-path
-
-      # tempo.el
-      uuidgen
-
-      # hx.el
-      expand-region
-      multiple-cursors
-      default-text-scale
-      popwin
-
-      # dir.el
-      openwith
-      dired-sidebar
-      nerd-icons-dired
-      projectile
-      consult
-      envrc
-      rg
-
-      # ai.el
-      ellama
-
-      # misc
-      undo-fu
-      vundo
-      minions
-      csv-mode
-      rainbow-mode
-      dashboard
-      xclip
-      modus-themes
-      centaur-tabs
-      nerd-icons-completion
-      which-key
-      vertico
-      marginalia
-      orderless
-      highlight
-      vterm
-      vterm-toggle
-      diff-hl
-      hl-todo
-      blamer
-      magit
-      magit-todos
-      xeft
-      company
       # tree-sitter for emacs 29+
       (treesit-grammars.with-grammars (grammars: with grammars; [
         tree-sitter-json
@@ -109,8 +62,58 @@
         tree-sitter-tsx
         tree-sitter-nix
         tree-sitter-elisp
+        tree-sitter-typst
       ]))
+      # modeline.el
+      shrink-path
+
+      # tempo.el
+      uuidgen
+
+      # hx.el
+      expand-region
+      multiple-cursors
+      default-text-scale
+      popwin
+
+      # dir.el
+      openwith
+      dired-du
+      dired-sidebar
+      nerd-icons-dired
+      projectile
+      consult
+      rg
+      envrc
+
+      # ai.el
+      ellama
+
+      # misc
+      undo-fu
+      vundo
+      minions
+      csv-mode
+      rainbow-mode
+      dashboard
+      xclip
+      modus-themes
+      centaur-tabs
+      nerd-icons-completion
+      vertico
+      marginalia
+      orderless
+      highlight
+      vterm
+      vterm-toggle
+      diff-hl
+      hl-todo
+      blamer
+      magit
+      magit-todos
+      company
     ];
+
     # add the directory to nix store as lua-language-server will try to watch the config dir
     # otherwise it uses high cpu since /nix/store is large
     extraConfig =

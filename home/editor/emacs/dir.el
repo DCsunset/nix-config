@@ -23,7 +23,7 @@
            "libreoffice"
            (file))
           (,(openwith-make-extension-regexp
-             '("png" "jpe?g" "svg" "gif" "tif"))
+             '("png" "jpe?g" "gif" "tif"))
            "imv"
            (file))
           (,(openwith-make-extension-regexp
@@ -53,19 +53,36 @@
 (use-package nerd-icons-dired
   :hook
   (dired-mode . nerd-icons-dired-mode))
+
+(use-package dired-du
+  :custom
+  (dired-du-size-format t))
+
+(defvar dired-hide-details-init t
+  "Initial state of `dired-hide-details-mode'.")
+
+(defun dired-toggle-hide-details-mode ()
+  "Toggle dired-hide-details to all and future dired buffers."
+  (interactive)
+  (let ((state (not dired-hide-details-init)))
+    (setq dired-hide-details-init state)
+	  (dolist (buf (buffer-list))
+	    (with-current-buffer buf
+        (when (memq major-mode '(dired-mode wdired-mode))
+          (dired-hide-details-mode (if state 1 -1)))))))
+
 (use-package dired
-  :commands (dired-up-directory
-             dired-find-file
-             dired-find-file-other-window
-             dired-mark
-             dired-toggle-read-only)
   :hook
-  (dired-mode . dired-hide-details-mode)
+  (dired-mode . (lambda () (dired-hide-details-mode (if dired-hide-details-init 1 -1))))
   (dired-mode . dired-omit-mode)
-  :init
+  :custom
+  (dired-listing-switches "-ahl")
   ;; hide files starting with dot
-  (setq dired-omit-files "\\`[.]")
-  (setq dired-dwim-target t))
+  (dired-omit-files "\\`[.]")
+  (dired-dwim-target t)
+  (dired-recursive-copies 'always)
+  (dired-clean-confirm-killing-deleted-buffers nil)
+  (dired-kill-when-opening-new-dired-buffer t))
 
 (defun dired-open-marked ()
   "Open all marked files with one command asynchronously."
@@ -86,30 +103,40 @@
 (modaled-define-keys
   :substates '("dired")
   :inherit
-  `((modaled-normal-state-keymap . ("l" "k" "L" "K" "C-l" "C-k" "g")))
+  `((modaled-normal-state-keymap . ("l" "k" "L" "K" "C-u" "C-d" "g" "|" "/" "n" "N")))
   :bind
-  `((("j" "DEL") . ("go to parent" . dired-up-directory))
+  `((("j" "<left>") . ("up dir" . ,(hx :eval (call-interactively
+                                                    (if (eq major-mode 'dired-mode)
+                                                        #'dired-up-directory
+                                                      #'dired-subtree-up)))))
+    ((";" "<right>") . ("down dir" . ,(hx :eval (call-interactively
+                                                    (if (eq major-mode 'dired-mode)
+                                                        #'dired-find-file
+                                                      (unless (dired-subtree--is-expanded-p)
+                                                        (dired-sidebar-subtree-toggle))
+                                                      #'dired-subtree-down)))))
     ;; TAB is also supported in `hx-toggle-visibility'
-    ((";" "RET") . ("open" . dired-find-file))
-    ("i" . ("toggle details" . dired-hide-details-mode))
+    ("RET" . ("open" . dired-find-file))
+    ("i" . ("toggle details" . dired-toggle-hide-details-mode))
+    ("I" . ("enable dired-du-mode" . dired-du-mode))
     ("h" . ("toggle hidden files" . dired-omit-mode))
     ("m" . ("mark" . ,(hx :region :eval dired-mark)))
     ("M-m" . ("mark by regexp" . dired-mark-files-regexp))
     ("M" . ("toggle all marks" . dired-toggle-marks))
     ("u" . ("unmark" . ,(hx :region :eval dired-unmark)))
     ("U" . ("unmark all" . dired-unmark-all-marks))
-    ("d" . ("delete" . dired-do-delete))
+    ("d" . ("delete" . ,(hx :let (dired-deletion-confirmer #'y-or-n-p) :eval dired-do-delete)))
     ("D" . ("delete permanently" . ,(hx :let (delete-by-moving-to-trash nil) :eval dired-do-delete)))
     ("H" . ("kill (hide)" . dired-do-kill-lines))
     ("y" . ("copy" . dired-do-copy))
     ("r" . ("rename" . dired-do-rename))
     ("R" . ("replace" . dired-do-find-regexp-and-replace))
-    ("n f" . ("new file" . dired-create-empty-file))
-    ("n d" . ("new dir" . dired-create-directory))
-    ("c m" . ("chmod" . dired-do-chmod))
-    ("c o" . ("chown" . dired-do-chown))
-    ("c g" . ("chgrp" . dired-do-chgrp))
-    ("c t" . ("touch" . dired-do-touch))
+    ("c f" . ("create file" . dired-create-empty-file))
+    ("c d" . ("create dir" . dired-create-directory))
+    ("C m" . ("chmod" . dired-do-chmod))
+    ("C o" . ("chown" . dired-do-chown))
+    ("C g" . ("chgrp" . dired-do-chgrp))
+    ("C t" . ("touch" . dired-do-touch))
     ;; run ! or & to open them separately
     ("o" . ("open (in one command)" . dired-open-marked))
     ;; use C-s or C-a to exit wdired mode

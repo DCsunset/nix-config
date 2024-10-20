@@ -13,7 +13,7 @@
   :after org)
 
 ;; for CJK font alignment in table
-(use-package valign-mode
+(use-package valign
   :hook
   (org-mode . valign-mode))
 
@@ -33,34 +33,19 @@
 
 ;; org-mode
 (use-package org
-  :commands (org-todo
-             org-entry-get
-             org-set-property
-             org-refile
-             org-priority
-             org-insert-structure-template
-             org-edit-special
-             org-open-at-point
-             org-ctrl-c-ctrl-c
-             org-export-dispatch
-             org-id-get-create
-             org-cycle
-             org-previous-visible-heading
-             org-next-visible-heading
-             org-forward-heading-same-level
-             org-backward-heading-same-level)
   :hook
   (org-mode . org-indent-mode)
-  (org-capture-mode . modaled-set-insert-state)
-  ;; don't pair angle bracket (used in tempo) in electric pair mode
   (org-mode . (lambda ()
-                (setq-local
-                 electric-pair-inhibit-predicate
-                 `(lambda (c)
-                    (if (char-equal c ?<)
-                        t
-                      ;; use the original pred
-                      (,electric-pair-inhibit-predicate c))))))
+                ;; turn off trailing whitespaces highlighting
+                (setq show-trailing-whitespace nil)
+                ;; don't pair angle bracket (used in tempo) in electric pair mode
+                (setq-local electric-pair-inhibit-predicate
+                            `(lambda (c)
+                               (if (char-equal c ?<)
+                                   t
+                                 ;; use the original pred
+                                 (,electric-pair-inhibit-predicate c))))))
+  (org-capture-mode . modaled-set-insert-state)
   :custom
   (org-babel-python-mode 'python-ts-mode)
   ;; don't truncate lines (wrap lines instead)
@@ -177,54 +162,6 @@ LOC can be `current' or `other'."
   (let ((item (org-entry-get nil "ITEM")))
     (org-set-property "CATEGORY" item)))
 
-
-;;; notes
-
-(defvar note-directory "~/.config/notes/data")
-(unless (file-exists-p note-directory)
-  (mkdir note-directory t))
-
-(use-package org-roam
-  :commands (org-capture-kill
-             org-capture-finalize
-             org-roam-db-autosync-mode
-             org-roam-node-find
-             org-roam-graph
-             org-roam-node-insert
-             org-roam-capture
-             org-roam-buffer-toggle)
-  :custom
-  (org-roam-directory (file-truename note-directory))
-  (org-roam-node-display-template
-   (concat "${title} "
-           "${tags}"))
-  (org-roam-capture-templates
-   `(("d" "default" plain "%?"
-      :unnarrowed t
-      :target (file+head
-               "${slug}.org"
-               ,(concat "#+title: ${title}\n")))))
-  :config
-  ; for cache consistency
-  (org-roam-db-autosync-mode))
-
-(use-package org-roam-ui
-  :after org-roam
-  :config
-  (setq org-roam-ui-sync-theme t
-        org-roam-ui-follow t
-        org-roam-ui-update-on-save t
-        org-roam-ui-open-on-start t))
-
-;; for note searching
-(use-package xeft
-  :commands (xeft)
-  :init
-  (setq xeft-directory note-directory)
-  (setq xeft-database "~/.config/emacs/xeft/db"))
-
-
-
 ;; org-mode specific keybindings
 (modaled-define-substate "org")
 (modaled-define-keys
@@ -234,11 +171,13 @@ LOC can be `current' or `other'."
     ("RET" . ("org open" . ,(hx :eval (org-open 'current))))
     ("' w" . ("org edit" . org-edit-special))
     ("' e" . ("org export" . org-export-dispatch))
-    ("' i t" . ("org insert template" . ,(hx :eval
-                                         (modaled-set-state "insert")
-                                         org-insert-structure-template)))
+    ("' i" . ("org insert" . (keymap)))
+    ("' i T" . ("org insert template" . ,(hx :eval
+                                             (modaled-set-state "insert")
+                                             org-insert-structure-template)))
     ("' i i" . ("org insert id" . org-id-get-create))
     ("' i c" . ("org insert category" . org-insert-category))
+    ("' i t" . ("org insert tag" . org-set-tags-command))
     ("' l" . ("org toggle link display" . org-toggle-link-display))
     ("' c" . ("org capture" . org-capture))
     ("' <" . ("org promote" . ,(hx :region :eval org-do-promote)))
@@ -263,10 +202,58 @@ LOC can be `current' or `other'."
   :substates '("org-agenda")
   :bind
   `(("r" . ("rebuild agenda view" . org-agenda-redo))
-    ("' t" . ("org todo" . ,(hx :region :eval org-agenda-todo gtd-save)))
-    ("' p" . ("org priority" . ,(hx :region :eval org-agenda-priority gtd-save)))
-    ("' r" . ("org refile" . ,(hx :region :eval org-agenda-refile gtd-save)))))
+    ("' t" . ("agenda todo" . ,(hx :region :eval org-agenda-todo gtd-save)))
+    ("' p" . ("agenda priority" . ,(hx :region :eval org-agenda-priority gtd-save)))
+    ("' r" . ("agenda refile" . ,(hx :region :eval org-agenda-refile gtd-save)))
+    ("' i" . ("agenda insert" . (keymap)))
+    ("' i t" . ("agenda insert tag" . org-agenda-set-tags))))
 (modaled-enable-substate-on-state-change
   "org-agenda"
   :states '("normal" "select")
   :major '(org-agenda-mode))
+
+
+;;; notes
+
+(defvar note-directory (expand-file-name "~/.config/notes"))
+(unless (file-exists-p note-directory)
+  (mkdir note-directory t))
+
+(use-package denote
+  :hook
+  (dired-mode . denote-dired-mode-in-directories)
+  :custom
+  (denote-directory note-directory)
+  (denote-backlinks-show-context t)
+  (denote-dired-directories (list note-directory))
+  (denote-dired-directories-include-subdirectories t)
+  (denote-prompts '(title))
+  (denote-save-buffers t)
+  (denote-date-format "%FT%T%z")
+  :custom-face
+  (denote-faces-link ((t :foreground "turquoise" :underline t))))
+
+;; for searching
+(use-package consult-denote
+  :custom
+  (consult-denote-find-command #'consult-fd)
+  (consult-denote-grep-command #'consult-ripgrep))
+
+(modaled-define-keys
+  :states '("normal" "select" "major")
+  :bind
+  `(("SPC n" . ("notes" . (keymap)))
+    ("SPC n n" . ("note new" . denote))
+    ("SPC n f" . ("note find" . (keymap)))
+    ("SPC n f a" . ("find all" . consult-denote-find))
+    ("SPC n f l" . ("find links" . denote-find-link))
+    ("SPC n f b" . ("find links" . denote-find-backlink))
+    ("SPC n s" . ("note search" . consult-denote-grep))
+    ("SPC n i" . ("note insert" . (keymap)))
+    ("SPC n i l" . ("insert link" . denote-link))
+    ("SPC n i d" . ("insert org dblock" . (keymap)))
+    ("SPC n i d l" . ("link dblock" . denote-org-extras-dblock-insert-links))
+    ("SPC n i d b" . ("backlink dblock" . denote-org-extras-dblock-insert-backlinks))
+    ("SPC n i d f" . ("file dblock" . denote-org-extras-dblock-insert-files))
+    ("SPC n r" . ("note rename" . denote-rename-file))))
+

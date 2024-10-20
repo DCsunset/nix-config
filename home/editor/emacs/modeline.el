@@ -30,9 +30,11 @@ CMD1 for \\`mouse-1' and CMD3 for \\`mouse-3'."
 
 ;;; major mode
 (my-modeline-def-construct my-modeline-major-mode
-  (propertize (surround-spaces
-               (capitalize (string-remove-suffix "-mode" (symbol-name major-mode))))
-              'face 'bold))
+  (list
+   (propertize (surround-spaces
+                (capitalize (string-remove-suffix "-mode" (symbol-name major-mode))))
+               'face 'bold)
+   " "))
 
 ;;; encoding
 (defvar my-modeline--encoding-map
@@ -220,7 +222,6 @@ CMD1 for \\`mouse-1' and CMD3 for \\`mouse-3'."
                 my-modeline-modaled
                 my-modeline-buffer
 
-                "              "  ; FIXME: remove this after Emacs 30
                 mode-line-format-right-align  ; emacs 30
 
                 my-modeline-eglot
