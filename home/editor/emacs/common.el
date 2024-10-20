@@ -38,17 +38,20 @@
 ;; don't use eval-when-compile to avoid bind-key errors
 (require 'use-package)
 
+(use-package gnutls
+  :config
+  ;; trust lan cert for services like irc
+  (add-to-list 'gnutls-trustfiles "/run/secrets/user/local-service/caddy/pki/lan/root.crt"))
+
 (use-package kkp
   :config
-  (global-kkp-mode +1))
+  (global-kkp-mode +1)
+  ;; translate some keys as kkp will overwrite them to another key in terminal
+  (keymap-set local-function-key-map "M-<return>" "M-RET"))
 
 (use-package dash)
 
-(use-package nerd-icons
-  :command (nerd-icons-codicon
-            nerd-icons-faicon
-            nerd-icons-octicon
-            nerd-icons-devicon))
+(use-package nerd-icons)
 
 (use-package modaled)
 
@@ -69,4 +72,12 @@
 ;; major-mode-specific state (keys defined in substates)
 (modaled-define-state "major"
   :cursor-type 'box)
+
+
+;; Common functions
+(defun read-file (file)
+  "Read contents of FILE and return as a string."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (buffer-string)))
 

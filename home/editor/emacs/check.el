@@ -25,7 +25,8 @@
              'minibuffer-mode
              'vterm-mode
              'special-mode
-             'org-agenda-mode)
+             'org-agenda-mode
+             'erc-mode)
       (flymake-cspell-setup)
       (flymake-mode 1))))
 

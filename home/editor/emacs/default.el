@@ -15,6 +15,11 @@
 ;; Set default font size for GUI
 (set-frame-font "Monospace 15" nil t)
 
+(use-package transient
+  :bind
+  (:map transient-map
+        ("<escape>" . transient-quit-one)))
+
 (use-package minions
   :commands minions-minor-modes-menu)
 
@@ -56,11 +61,11 @@
   (setq dashboard-set-init-info t)
   (dashboard-setup-startup-hook))
 
-;; xclip (to support clipboard in terminal
+;; xclip (to support clipboard in Xorg & Wayland)
+;; need xclip or wl-clipboard-rs
 (use-package xclip
-  :commands (xclip-mode xclip-get-selection xclip-set-selection)
-  :init
-  (xclip-mode 1))
+  :hook
+  (after-init . xclip-mode))
 
 (use-package modus-themes
   :config
@@ -68,22 +73,22 @@
 
 ;; tabs
 (use-package centaur-tabs
-  :commands (centaur-tabs-mode
-             centaur-tabs-forward
-             centaur-tabs-backward
-             centaur-tabs-forward-group
-             centaur-tabs-backward-group
-             centaur-tabs-headline-match)
+  :demand t
   :custom-face
-  (centaur-tabs-active-bar-face ((t (:background "#c4569e"))))
-  :init
-  (setq centaur-tabs-icon-type 'nerd-icons
-        centaur-tabs-cycle-scope 'tabs
-        centaur-tabs-set-icons t
-        centaur-tabs-set-close-button nil
-        centaur-tabs-show-new-tab-button nil
-        centaur-tabs-set-bar 'under
-        x-underline-at-descent-line t)
+  (centaur-tabs-active-bar-face ((t :background "#c4569e")))
+  :custom
+  (centaur-tabs-icon-type 'nerd-icons)
+  (centaur-tabs-cycle-scope 'tabs)
+  (centaur-tabs-set-icons t)
+  (centaur-tabs-set-close-button nil)
+  (centaur-tabs-show-new-tab-button nil)
+  (centaur-tabs-set-bar 'under)
+  (x-underline-at-descent-line t)
+  :config
+  ;; hide in dired sidebar
+  (setq centaur-tabs-hide-predicate
+        (lambda () (memq major-mode '(dired-sidebar-mode
+                                      org-agenda-mode))))
   (centaur-tabs-mode 1))
 
 ;; Fix from https://github.com/ema2159/centaur-tabs/issues/127#issuecomment-1126913492
@@ -100,32 +105,33 @@
               (fix-centaur-tabs)))
 
 (use-package which-key
-  :commands which-key-mode
-  :init
-  (setq-default which-key-idle-delay 0.01)  ; show desc immediately
-  ;; call mode in :init to enable it immediately
+  :demand t
+  :custom
+  (which-key-idle-delay 0.01)  ; show desc immediately
+  :config
   (which-key-mode))
 
-;;; Completion UI in  minibuffer
+;;; Completion UI in minibuffer
 (use-package vertico
-  :commands vertico-mode
+  :demand t
   ;; Tidy shadowed file names in find-file
-  :hook (rfn-eshadow-update-overlay . vertico-directory-tidy)
-  :init
+  :hook
+  (rfn-eshadow-update-overlay . vertico-directory-tidy)
+  :config
   ;; call mode in :init to enable it immediately
   (vertico-mode))
 
 ;;; Enable rich annotations in minibuffer completion
 (use-package marginalia
-  :commands marginalia-mode
+  :demand t
   ;; Bind `marginalia-cycle' locally in the minibuffer.  To make the binding
   ;; available in the *Completions* buffer, add it to the
   ;; `completion-list-mode-map'.
   :bind (:map minibuffer-local-map
          ("M-A" . marginalia-cycle))
   ;; The :init section is always executed.
-  :init
-  ;; Marginalia must be actived in the :init section of use-package such that
+  :config
+  ;; Marginalia must be activated in the :init section of use-package such that
   ;; the mode gets enabled right away. Note that this forces loading the
   ;; package.
   (marginalia-mode))
@@ -138,8 +144,8 @@
 
 ;;; icons for completion UI in minibuffer
 (use-package nerd-icons-completion
-  :commands nerd-icons-completion-mode
-  :init
+  :demand t
+  :config
   (nerd-icons-completion-mode))
 
 ;;; company completion
@@ -151,8 +157,8 @@
               ;; (must use TAB for terminal and <tab> for gui)
               ("TAB" . company-complete-selection)
               ("<tab>" . company-complete-selection)
-              ("M-TAB" . company-complete-common)
-              ("M-<tab>" . company-complete-common)
+              ("S-TAB" . company-complete-common)
+              ("S-<tab>" . company-complete-common)
               ;; unbind following keys to make the default keybindings work
               ("RET" . nil)
               ("<return>" . nil)
@@ -171,11 +177,9 @@
 
 ;; Manage popup window
 (use-package popwin
-  :commands (popwin-mode
-             popwin:close-popup-window)
-  :init
-  (popwin-mode 1)
+  :demand t
   :config
+  (popwin-mode 1)
   ;; make help window stick around
   (add-to-list 'popwin:special-display-config '(help-mode :stick t))
   (add-to-list 'popwin:special-display-config '("\\*eldoc.*\\*" :regexp t :noselect t)))
@@ -183,10 +187,8 @@
 
 ;; git
 (use-package diff-hl
-  :commands (diff-hl-margin-mode
-             diff-hl-flydiff-mode
-             global-diff-hl-mode)
-  :init
+  :demand t
+  :config
   (global-diff-hl-mode 1)
   (diff-hl-flydiff-mode 1)
   ;; use margin mode to support terminal emacs
@@ -206,10 +208,7 @@
   (after-save . magit-after-save-refresh-status)
   (git-commit-mode . modaled-set-insert-state)
   :config
-  ;; always show recent & unpushed commits
-  (magit-add-section-hook 'magit-status-sections-hook
-                          #'magit-insert-unpushed-to-upstream
-                          #'magit-insert-unpushed-to-upstream-or-recent)
+  ;; always show recent commits instead of unpushed commits
   (magit-add-section-hook 'magit-status-sections-hook
                           #'magit-insert-recent-commits
                           #'magit-insert-unpushed-to-upstream-or-recent
@@ -246,16 +245,17 @@
   :major '(magit-status-mode))
 
 
-;; vterm (insert as default state)
+;;; vterm (insert as default state)
 (use-package vterm
   :commands (vterm-reset-cursor-point vterm--self-insert)
   :hook
   (vterm-mode . (lambda ()
                   ;; turn off trailing whitespaces highlighting
                   (setq show-trailing-whitespace nil))))
+
 ;; vterm specific keybindings
 (modaled-define-substate "vterm")
-; reset to the right position when entering insert mod3
+; reset to the right position when entering insert mode
 (modaled-define-keys
   :substates '("vterm")
   :bind
@@ -299,7 +299,7 @@
                  (window-height . 0.3))))
 
 
-;; undo
+;;; undo
 (use-package undo-fu)
 (use-package vundo)
 
@@ -322,4 +322,35 @@
   "vundo"
   :states '("normal" "select")
   :major '(vundo-mode))
+
+
+;;; erc
+(use-package erc
+  :hook
+  (erc-mode . (lambda () (setq show-trailing-whitespace nil)))
+  (modaled-insert-state-mode . (lambda ()
+                                 ;; reset cursor after entering insert state for erc
+                                 (when (and (eq major-mode 'erc-mode)
+                                            modaled-insert-state-mode
+                                            (not (eq (line-number-at-pos)
+                                                     (line-number-at-pos (point-max)))))
+                                   (goto-char (point-max)))))
+  :config
+  ;; switch to buffer after joining (:custom doesn't work)
+  (setq erc-buffer-display 'buffer)
+  ;; enable desktop notification when mentioned
+  (custom-set-variables
+   '(erc-modules (push 'notifications erc-modules))))
+
+(modaled-define-substate "erc-insert"
+  :sparse t
+  :no-suppress t)
+(modaled-define-keys
+  :substates '("erc-insert")
+  :bind
+  `((("C-p" "<up>") . ("previous cmd" . erc-previous-command))
+    (("C-n" "<down>") . ("next cmd" . erc-next-command))))
+(modaled-enable-substate-on-state-change "erc-insert"
+  :states '("insert")
+  :major '(erc-mode))
 
