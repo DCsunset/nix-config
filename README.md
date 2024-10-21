@@ -5,8 +5,9 @@ My person common Nix config.
 
 ## Usage
 
-Simply import the module in your home-manager config and
-make sure `dc-lib = nur-dcsunset.lib` is added to `extraSpecialArgs` in home-manager modules.
+Simply import the module in your home-manager config,
+make sure `dc-lib = nur-dcsunset.lib` is added to `extraSpecialArgs` in home-manager modules,
+and `nur-dcsunset.overlays.pkgs` is applied to nixpkgs.
 
 Example:
 
@@ -30,7 +31,10 @@ Example:
     user = "USER";
   in {
     homeConfigurations.${user}= home-manager.lib.homeManagerConfiguration {
-      pkgs = import nixpkgs { system = "x86_64"; };
+      pkgs = import nixpkgs {
+        system = "x86_64";
+        dc-nix-config.url = "github:DCsunset/nix-config";
+      };
       extraSpecialArgs = {
         dc-lib = nur-dcsunset.lib;
       };
