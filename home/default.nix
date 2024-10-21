@@ -20,10 +20,26 @@ in
   config = lib.mkMerge [
     {
       home.packages = with pkgs; [
-        nodePackages.cspell
+        nix-tree
+        bottom
+        htop
+        openssh
+        socat
+        websocat
+        dig
+        neofetch
+        tokei
+        ripgrep
+        fd
+        sqlite
+        xh
+        wget
+        curl
+        dufs
         (python3.withPackages (ps: with ps; [
           matplotlib
         ]))
+        nodePackages.cspell
       ];
     }
 
