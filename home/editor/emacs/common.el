@@ -3,9 +3,10 @@
 ;;; General config
 
 ;; UI config
-(tool-bar-mode -1)
-(menu-bar-mode -1)
-(scroll-bar-mode -1)
+(when (display-graphic-p)
+  (tool-bar-mode -1)
+  (menu-bar-mode -1)
+  (scroll-bar-mode -1))
 (blink-cursor-mode -1)
 (electric-pair-mode 1)  ; auto complete pair
 (setq-default visible-cursor nil ; for non-blinking cursor in console
