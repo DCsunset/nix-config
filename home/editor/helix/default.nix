@@ -7,7 +7,7 @@ with lib;
 
     # config.toml
     settings = {
-      theme = "dark_plus";
+      theme = "modus_vivendi";
       editor = {
         cursor-shape.insert = "bar";
         soft-wrap.enable = true;
