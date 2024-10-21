@@ -11,11 +11,11 @@
       # for HTML/CSS/JSON/ESLint language servers
       vscode-langservers-extracted
       # emacs lsp-mode relies on typescript package
-      nodePackages.typescript
-      nodePackages.typescript-language-server
-      nodePackages.bash-language-server
-      nodePackages.yaml-language-server
-      nodePackages.dockerfile-language-server-nodejs
+      typescript
+      typescript-language-server
+      bash-language-server
+      yaml-language-server
+      dockerfile-language-server-nodejs
       python3Packages.python-lsp-server
       haskell-language-server
       rust-analyzer
