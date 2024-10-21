@@ -1,12 +1,12 @@
 { config, pkgs, lib, dc-lib, ... }:
 
 let
-  cfg = config.custom;
+  cfg = config.dc-home;
 in
 {
-  imports = dc-lib.importSubdirs ./home;
+  imports = dc-lib.importSubdirs ./.;
 
-  options.custom = {
+  options.dc-home = {
     gui = {
       enable = lib.mkEnableOption "gui apps";
       displayServer = lib.mkOption {
