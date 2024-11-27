@@ -20,6 +20,8 @@ in
   config = lib.mkMerge [
     {
       home.packages = with pkgs; [
+        pueue
+        iproute2
         nix-tree
         bottom
         htop
@@ -36,6 +38,7 @@ in
         wget
         curl
         dufs
+        ranger
         (python3.withPackages (ps: with ps; [
           matplotlib
         ]))
