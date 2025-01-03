@@ -39,6 +39,7 @@ in
         curl
         dufs
         ranger
+        tmux
         (python3.withPackages (ps: with ps; [
           matplotlib
         ]))
