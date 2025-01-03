@@ -41,8 +41,14 @@ in
         ranger
         tmux
         (python3.withPackages (ps: with ps; [
+          pyyaml
           matplotlib
-        ]))
+          numpy
+          scipy
+          pandas
+          psutil
+          requests
+        ] ++ requests.optional-dependencies.socks))
         nodePackages.cspell
       ];
     }
