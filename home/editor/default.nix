@@ -17,7 +17,6 @@
       yaml-language-server
       dockerfile-language-server-nodejs
       python3Packages.python-lsp-server
-      haskell-language-server
       rust-analyzer
       taplo
       gopls

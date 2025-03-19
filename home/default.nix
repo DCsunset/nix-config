@@ -40,9 +40,11 @@ in
         dufs
         ranger
         tmux
+        lean4
         (python3.withPackages (ps: with ps; [
           pyyaml
           matplotlib
+          scienceplots
           numpy
           scipy
           pandas
