@@ -48,7 +48,7 @@ Example:
             custom = {
               emacs-dcsunset = inputs.emacs-dcsunset.packages.${prev.system};
             };
-          ))
+          })
         ];
       };
       extraSpecialArgs = {
