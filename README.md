@@ -36,12 +36,13 @@ Example:
   };
 
   outputs = inputs@{ nixpkgs, nur-dcsunset, dc-nix-config, home-manager, ... }: let
-    // Replace this
+    # Replace this
     user = "USER";
+    homeDir = "/home/${user}";
   in {
     homeConfigurations.${user} = home-manager.lib.homeManagerConfiguration {
       pkgs = import nixpkgs {
-        system = "x86_64";
+        system = "x86_64-linux";
         overlays = [
           nur-dcsunset.overlays.pkgs
           (final: prev: {
@@ -59,13 +60,13 @@ Example:
         dc-nix-config.home
         {
           home.username = user;
-          home.homeDirectory = "/home/${user}";
+          home.homeDirectory = homeDir;
           home.stateVersion = "24.11";
 
           programs.home-manager.enable = true;
 
           # dc-home options
-          dc-home.gui.enable = true;
+          # dc-home.gui.enable = true;
         }
       ];
     };
