@@ -63,6 +63,7 @@ in
 
       home.sessionPath = [
         "${config.home.homeDirectory}/.npm/bin"
+        "${config.home.homeDirectory}/go/bin"
       ];
     }
 
