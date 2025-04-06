@@ -60,6 +60,10 @@ in
       home.file.".npmrc".text = ''
         prefix = ''${HOME}/.npm
       '';
+
+      home.sessionPath = [
+        "${config.home.homeDirectory}/.npm/bin"
+      ];
     }
 
     (lib.mkIf (cfg.gui.enable && cfg.gui.displayServer == "x11") {
