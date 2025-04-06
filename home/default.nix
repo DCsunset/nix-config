@@ -20,6 +20,7 @@ in
   config = lib.mkMerge [
     {
       home.packages = with pkgs; [
+        parallel
         pueue
         iproute2
         nix-tree
@@ -52,6 +53,8 @@ in
           requests
         ] ++ requests.optional-dependencies.socks))
         nodePackages.cspell
+        go
+        nodejs
       ];
     }
 
