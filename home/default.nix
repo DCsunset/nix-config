@@ -56,6 +56,10 @@ in
         go
         nodejs
       ];
+
+      home.file.".npmrc".text = ''
+        prefix = ''${HOME}/.npm
+      '';
     }
 
     (lib.mkIf (cfg.gui.enable && cfg.gui.displayServer == "x11") {
