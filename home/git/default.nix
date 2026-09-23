@@ -1,11 +1,14 @@
 { pkgs, ... }:
 
+let
+  osHelpers = import ../../lib/helpers.nix { inherit pkgs; };
+in
 {
   programs = {
     git = {
       enable = true;
       # use canonical timezone to hide location for privacy
-      package = pkgs.osHelpers.wrapPackage pkgs.git "--set TZ Etc/UTC";
+      package = osHelpers.wrapPackage pkgs.git "--set TZ Etc/UTC";
       lfs.enable = true;
 
       settings = {
