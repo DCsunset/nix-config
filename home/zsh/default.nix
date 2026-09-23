@@ -1,16 +1,22 @@
+{ lib, config, ... }:
+
 {
   programs.zsh = {
     enable = true;
+    dotDir = "${config.xdg.configHome}/zsh";
     # fish-like autosuggestion
     autosuggestion.enable = true;
     # Enable zsh syntax highlighting
     syntaxHighlighting.enable = true;
-    # util functions
-    initExtra = builtins.readFile ./zshrc.zsh;
-    # Add user completions to fpath
-    initExtraBeforeCompInit = ''
-      fpath+=(~/.zsh_completions)
-    '';
+    initContent = lib.mkMerge [
+      # Add user completions to fpath (before completion init)
+      (lib.mkOrder 550 ''
+        fpath+=(~/.zsh_completions)
+      '')
+
+      # shell settings
+      (builtins.readFile ./zshrc.zsh)
+    ];
   };
 }
 
