@@ -25,7 +25,7 @@ in
         socat
         websocat
         dig
-        neofetch
+        fastfetch
         tokei
         ripgrep
         fd
