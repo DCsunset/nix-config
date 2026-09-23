@@ -15,7 +15,7 @@
       typescript-language-server
       bash-language-server
       yaml-language-server
-      dockerfile-language-server-nodejs
+      dockerfile-language-server
       python3Packages.python-lsp-server
       rust-analyzer
       taplo
