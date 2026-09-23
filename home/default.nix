@@ -40,7 +40,8 @@ in
         (python3.withPackages (ps: with ps; [
           pyyaml
           matplotlib
-          scienceplots
+          # HACK: wait until https://github.com/NixOS/nixpkgs/pull/552741 is merged
+          # scienceplots
           numpy
           scipy
           pandas
