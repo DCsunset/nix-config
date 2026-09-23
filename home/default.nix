@@ -9,11 +9,6 @@ in
   options.dc-home = {
     gui = {
       enable = lib.mkEnableOption "gui apps";
-      displayServer = lib.mkOption {
-        type = lib.types.enum [ "x11" "wayland" ];
-        default = "x11";
-        description = "Display server";
-      };
     };
   };
 
@@ -52,7 +47,7 @@ in
           psutil
           requests
         ] ++ requests.optional-dependencies.socks))
-        nodePackages.cspell
+        cspell
         go
         nodejs
       ];
@@ -67,19 +62,7 @@ in
       ];
     }
 
-    (lib.mkIf (cfg.gui.enable && cfg.gui.displayServer == "x11") {
-      home.packages = with pkgs; [
-        highlight-pointer
-        xdragon
-        xdotool
-        xclip
-        xorg.xmodmap
-        xorg.xev
-        xorg.xdpyinfo
-      ];
-    })
-
-    (lib.mkIf (cfg.gui.enable && cfg.gui.displayServer == "wayland") {
+    (lib.mkIf cfg.gui.enable {
       home.packages = with pkgs; [
         wev
         wl-clipboard-rs

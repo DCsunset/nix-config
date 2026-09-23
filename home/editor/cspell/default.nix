@@ -38,7 +38,7 @@ in
   home.file.".config/configstore/cspell.json".text = builtins.toJSON cspellConfig;
 
   home.packages = with pkgs; [
-    nodePackages.cspell
+    cspell
   ];
 }
 
